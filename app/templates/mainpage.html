@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatsApp</title>
+    <link rel="stylesheet" href="/app/styleManager/style.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+    <div class="app">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="search">
+                <i class="fas fa-search"></i>
+                <input type="text" placeholder="Search">
+                <i class="fas fa-ellipsis-v menu-icon"></i>
+            </div>
+
+            <div class="tabs">
+                <button class="active">Все</button>
+                <button>Непрочитанное</button>
+                <button>Группы</button>
+            </div>
+
+            <div class="chat-list">
+                <div class="chat selected">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/1/1b/American_Institute_of_Technology_Logo.png"
+                        alt="">
+                    <div>
+                        <strong>AIT</strong>
+                        <p>Эрбол: Привет</p>
+                    </div>
+                </div>
+                <div class="chat">
+                    <img src="https://via.placeholder.com/40x40" alt="">
+                    <div>
+                        <strong>Alymbek</strong>
+                        <p>Help! I’m in the hole</p>
+                    </div>
+                </div>
+                <div class="chat">
+                    <img src="https://via.placeholder.com/40x40" alt="">
+                    <div>
+                        <strong>Alaman</strong>
+                        <p>Look at the beauty of this image</p>
+                    </div>
+                </div>
+                <!-- Добавь оставшиеся чаты по аналогии -->
+            </div>
+
+            <div class="bottom-icons">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-camera"></i>
+                <i class="fas fa-folder"></i>
+                <i class="fas fa-plus"></i>
+                <i class="fas fa-user-circle"></i>
+            </div>
+        </div>
+
+        <!-- Chat area -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <div>
+                    <strong>AIT</strong>
+                    <p>Aktan, Alym, Talant, Gulnura, Salma, Erlan, Daniyar, Daniyal</p>
+                </div>
+                <i class="fas fa-ellipsis-v"></i>
+            </div>
+
+            <div class="chat-messages">
+                <div class="msg other" style="--color:#B71C1C">
+                    <strong>Alaman</strong>
+                    <p>Who's up for a movie tomorrow?</p>
+                    <span>10:56</span>
+                </div>
+                <div class="msg other" style="--color:#FFD600">
+                    <strong>Alymbek</strong>
+                    <p>I'm in! What are we watching?</p>
+                    <span>10:56</span>
+                </div>
+                <div class="msg other" style="--color:#0D47A1">
+                    <strong>Talant</strong>
+                    <p>Horror?</p>
+                    <span>10:57</span>
+                </div>
+                <div class="msg other" style="--color:#E91E63">
+                    <strong>Emir</strong>
+                    <p>Nope, last time I had nightmares for a week!</p>
+                    <span>10:57</span>
+                </div>
+                <div class="msg mine">
+                    <p>Sounds good! What time?</p>
+                    <span>10:58</span>
+                </div>
+                <div class="msg mine">
+                    <p>Comedy then?</p>
+                    <span>10:58</span>
+                </div>
+            </div>
+
+            <div class="chat-input">
+                <i class="far fa-smile"></i>
+                <input type="text" placeholder="Enter the message">
+                <i class="fas fa-camera"></i>
+                <i class="fas fa-microphone"></i>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- 
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatsApp</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+</head>
+
+<body>
+    <div class="chat-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="search-bar">
+                <input type="text" placeholder="Search" />
+                <i class="fas fa-ellipsis-v"></i>
+            </div>
+            <div class="tabs">
+                <button class="active">Все</button>
+                <button>Непрочитанное</button>
+                <button>Группы</button>
+            </div>
+            <div class="chat-list">
+                <div class="chat active">
+                    <img src="ait-logo.png" class="avatar" />
+                    <div>
+                        <h4>AIT</h4>
+                        <p>Эрбол: Привет</p>
+                    </div>
+                </div>
+                <div class="chat"><img src="p2.jpg" class="avatar" />
+                    <div>
+                        <h4>Alymbek</h4>
+                        <p>Help! I'm in the hole</p>
+                    </div>
+                </div>
+                <div class="chat"><img src="p3.jpg" class="avatar" />
+                    <div>
+                        <h4>Alaman</h4>
+                        <p>Look at the beauty of this image</p>
+                    </div>
+                </div>
+                <!-- ... добавь остальных ... -->
+            </div>
+            <div class="bottom-nav">
+                <i class="fas fa-bars"></i>
+                <i class="fas fa-camera"></i>
+                <i class="fas fa-folder-plus"></i>
+                <i class="fas fa-plus-circle"></i>
+                <i class="fas fa-user-circle"></i>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <img src="ait-logo.png" class="avatar" />
+                <div>
+                    <h3>AIT</h3>
+                    <p>Aktan, Alym, Talant, Gulnura, Salma, Erlan, Daniyar</p>
+                </div>
+                <i class="fas fa-ellipsis-v"></i>
+            </div>
+
+            <div class="messages">
+                <div class="msg others"><span class="name red">Alaman</span>Who's up for a movie tomorrow?<span
+                        class="time">10:56</span></div>
+                <div class="msg others"><span class="name yellow">Alymbek</span>I'm in! What are we watching?<span
+                        class="time">10:56</span></div>
+                <div class="msg others"><span class="name blue">Talant</span>Horror?<span class="time">10:57</span>
+                </div>
+                <div class="msg others"><span class="name pink">Emir</span>Nope, last time I had nightmares for a
+                    week!<span class="time">10:57</span></div>
+                <div class="msg mine">Sounds good! What time?<span class="time">10:58</span></div>
+                <div class="msg mine">Comedy then?<span class="time">10:58</span></div>
+            </div>
+
+            <div class="input-bar">
+                <input type="text" placeholder="Enter the message" />
+                <i class="fas fa-paperclip"></i>
+                <i class="fas fa-microphone"></i>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html> -->
