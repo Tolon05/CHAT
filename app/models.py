@@ -1,10 +1,9 @@
-from app import db
-import datetime
+from sqlalchemy import Column, Integer, String
+from app.database import Base
 
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(100), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    otp_secret = db.Column(db.String(16), unique=True, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    phone_number = Column(String, nullable=True) 
+    hashed_password = Column(String)
