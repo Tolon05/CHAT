@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+sqlalchemy
+aiomysql
+aiosqlite
+passlib
+redis
+celery
+jose
+python-dotenv

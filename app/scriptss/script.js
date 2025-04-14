@@ -1,5 +1,9 @@
 function togglePassword() {
     const passwordField = document.getElementById("password");
-    const type = passwordField.type === "password" ? "text" : "password";
-    passwordField.type = type;
+    const isHidden = passwordField.type === "password";
+
+    passwordField.type = isHidden ? "text" : "password";
+
+    document.querySelector(".icon-eye").style.display = isHidden ? "none" : "inline";
+    document.querySelector(".icon-eye-off").style.display = isHidden ? "inline" : "none";
 }
