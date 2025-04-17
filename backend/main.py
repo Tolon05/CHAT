@@ -9,8 +9,9 @@ from backend.auth.routes import router
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.middleware.sessions import SessionMiddleware
 # from celery_worker import celery
-# from config import settings
+from backend.config import settings
 
 async def lifespan(app: FastAPI):
     print("Приложение запускается...")
@@ -20,6 +21,8 @@ async def lifespan(app: FastAPI):
     print("Приложение завершает работу...")
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(SessionMiddleware, secret_key=settings.SESSION_SECRET_KEY)
 
 app.add_middleware(
     CORSMiddleware,

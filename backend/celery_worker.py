@@ -1,6 +1,6 @@
 import asyncio
 from celery import Celery
-from config import settings
+from backend.config import settings
 from backend.auth.email_utils import send_verification_email
 
 celery = Celery(

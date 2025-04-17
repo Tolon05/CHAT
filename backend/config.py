@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     DATABASE_URL: str = Field(default="sqlite+aiosqlite:///./app.db")
     SECRET_KEY: str = Field(default_factory=lambda: os.getenv("SECRET_KEY", "some_secret_key"))
+    SESSION_SECRET_KEY: str = Field(default_factory=lambda: os.getenv("SESSION_SECRET_KEY", "some_secret_key"))
     EMAIL: str = Field(default_factory=lambda: os.getenv("EMAIL"))
     EMAIL_PASSWORD: str = Field(default_factory=lambda: os.getenv("EMAIL_PASSWORD"))
     

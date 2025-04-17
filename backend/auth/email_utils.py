@@ -1,12 +1,13 @@
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from config import settings
+from backend.config import settings
 
 async def send_verification_email(to_email: str, code: str):
     from_email = settings.EMAIL
     from_password = settings.EMAIL_PASSWORD
 
+    # Создание сообщения
     msg = MIMEMultipart()
     msg['From'] = from_email
     msg['To'] = to_email
@@ -15,6 +16,13 @@ async def send_verification_email(to_email: str, code: str):
     body = f'Your verification code is: {code}'
     msg.attach(MIMEText(body, 'plain'))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(from_email, from_password)
-        server.sendmail(from_email, to_email, msg.as_string())
+    try:
+        # Подключение к серверу SMTP через SSL
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(from_email, from_password)  # Вход с email и паролем приложения
+            server.sendmail(from_email, to_email, msg.as_string())  # Отправка письма
+        print("Verification email sent successfully")
+    except smtplib.SMTPAuthenticationError:
+        print("Authentication failed. Please check your email and password.")
+    except Exception as e:
+        print(f"Error: {str(e)}")

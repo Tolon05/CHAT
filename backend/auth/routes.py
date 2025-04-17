@@ -6,35 +6,39 @@ from fastapi import APIRouter, Request, Form, Depends, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates  # Импортируем Jinja2Templates
 from sqlalchemy.orm import Session
+from sqlalchemy.future import select
+from sqlalchemy import or_
+from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import SessionLocal, get_db
 from backend.models import User, EmailCode, Device
 from backend.security import hash_password, verify_password
 from backend.tasks import send_verification_email
 import random, datetime
-# from ..token_utils import create_access_token, create_refresh_token
-# from backend.session_utils import store_session, get_session
+from backend.token_utils import create_access_token, create_refresh_token
+from backend.session_utils import store_session, get_session, store_verification_code, verify_code, delete_verification_code
 
 router = APIRouter()
 
-# Создаём объект templates, указываем путь к папке с шаблонами
-# templates = Jinja2Templates(directory="templates")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend", "templates"))
 
 @router.get("/register", response_class=HTMLResponse)
 async def register_form(request: Request):
+    print("Загружаем страницу register.html")
     return templates.TemplateResponse("register.html", {"request": request})
 
 @router.post("/register")
-async def register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...), db: Session = Depends(get_db)):
-    user = db.query(User).filter((User.username == username) | (User.email == email)).first()
+async def register(request: Request, username: str = Form(...), email: str = Form(...), password: str = Form(...), db: AsyncSession = Depends(get_db)):
+    query = select(User).where(or_(User.username == username, User.email == email))
+    result = await db.execute(query)
+    user = result.scalars().first()
     if user:
         raise HTTPException(status_code=400, detail="Пользователь уже существует")
+    print("User does not exist")
 
     code = str(random.randint(1000, 9999))
-    expires = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=10)
-    db.add(EmailCode(email=email, code=code, expires_at=expires))
-    db.commit()
+
+    await store_verification_code(email, code, expires_minutes=5)
 
     await send_verification_email(email, code)
 
@@ -44,9 +48,10 @@ async def register(request: Request, username: str = Form(...), email: str = For
     
     return RedirectResponse("/verify", status_code=303)
 
-# @router.get("/verify", response_class=HTMLResponse)
-# async def verify_form(request: Request):
-#     return templates.TemplateResponse("verify.html", {"request": request})
+@router.get("/verify", response_class=HTMLResponse)
+async def verify_form(request: Request):
+    print("Загружаем страницу verify.html")
+    return templates.TemplateResponse("verify.html", {"request": request})
 
 # @router.post("/verify")
 # async def verify(request: Request, code: str = Form(...), db: Session = Depends(get_db)):
