@@ -1,35 +1,75 @@
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from backend.config import settings
+from backend.session_utils import is_refresh_token_blacklisted
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_MINUTES = 1440 
+REFRESH_TOKEN_EXPIRE_MINUTES = 1440
 
-def create_access_token(data: dict, expires_delta: timedelta = None):
+async def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_refresh_token(data: dict, expires_delta: timedelta = None):
+async def create_refresh_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def verify_token(token: str):
+async def verify_access_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
+
+        if payload.get("exp") < datetime.now(timezone.utc).timestamp():
+            return None  
+
+        return payload.get("user_id")
+
+    except jwt.ExpiredSignatureError:
+        return None  
+    except jwt.JWTError:
+        return None  
+
+async def verify_refresh_token(refresh_token: str) -> int:
+    try:
+        payload = jwt.decode(refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+
+        user_id = payload.get("user_id")
+        
+        if user_id is None:
+            return None
+
+        blacklisted = await is_refresh_token_blacklisted(user_id, refresh_token)
+        if blacklisted:
+            return None
+
+        exp = payload.get("exp")
+        from datetime import datetime, timezone
+
+        if exp and datetime.fromtimestamp(exp, tz=timezone.utc) < datetime.now(timezone.utc):
+            return None  
+
+        return user_id  
     except JWTError:
-        return None
+        return None 
+
+async def get_token_ttl(token: str, algorithm: str = "HS256") -> int:
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[algorithm])
+    exp_timestamp = payload.get("exp")
+    if not exp_timestamp:
+        raise ValueError("Token does not contain 'exp'")
+
+    exp_time = datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
+    now = datetime.now(timezone.utc)
+    ttl_seconds = int((exp_time - now).total_seconds())
+
+    if ttl_seconds <= 0:
+        raise ValueError("Token already expired")
+
+    return ttl_seconds + 1
