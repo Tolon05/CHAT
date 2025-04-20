@@ -2,20 +2,11 @@ import redis.asyncio as redis
 from datetime import timedelta
 from backend.config import settings
 
-redis_sessions = redis.from_url(
-    f"redis://:{settings.REDIS_PASSWORD}@{settings.REDIS_HOST}:{settings.REDIS_PORT}/3",
-    decode_responses=True
-)
+redis_sessions = redis.from_url(settings.REDIS_SESSIONS_URL, decode_responses=True)
 
-redis_codes = redis.from_url(
-    f"redis://:{settings.REDIS_PASSWORD}@{settings.REDIS_HOST}:{settings.REDIS_PORT}/2",
-    decode_responses=True
-)
+redis_codes = redis.from_url(settings.REDIS_CODES_URL, decode_responses=True)
 
-redis_blacklist = redis.from_url(
-    f"redis://:{settings.REDIS_PASSWORD}@{settings.REDIS_HOST}:{settings.REDIS_PORT}/5",
-    decode_responses=True
-)
+redis_blacklist = redis.from_url(settings.REDIS_BLACKLIST_URL, decode_responses=True)
 
 # async def store_session(user_id: int, session_data: dict):
 #     async with redis_sessions.pipeline() as pipe:
@@ -31,7 +22,7 @@ async def store_refresh_token(user_id: int, refresh_token: str, expiration_time:
 async def get_session(user_id: int):
     return await redis_sessions.hgetall(f"user:{user_id}:session")
 
-async def store_verification_code(email: str, code: str, expires_minutes: int = 5):
+async def store_verification_code(email: str, code: str, expires_minutes: int):
     key = f"verify:{email}"
     await redis_codes.set(key, code, ex=expires_minutes * 60)
 

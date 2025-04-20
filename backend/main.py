@@ -9,13 +9,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import create_tables, engine
 from backend.auth.routes import router
+from backend.dashboard.routes import router_dash
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from backend.config import settings
-from backend.token_utils import verify_access_token
+from backend.auth.token_utils import verify_access_token
 
 
 
@@ -30,13 +31,12 @@ async def lifespan(app: FastAPI):
     print("🔧 Запуск Celery worker...")
     celery_process = subprocess.Popen([
         "celery",
-        "-A", "backend.celery_worker.celery",
+        "-A", "backend.celery_tasks.celery_worker.celery",
         "worker",
         "--loglevel=info", 
         "--concurrency=1",  
         "--pool=solo",      # Для Windows, чтобы избежать ошибок с многопроцессностью
     ])
-
 
     yield  
     await engine.dispose() 
@@ -52,7 +52,8 @@ app = FastAPI(lifespan=lifespan)
 
 class RefreshMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
-        allowed_paths = ["/refresh", "/login", "/register", "/favicon.ico", "/verify"]
+        
+        allowed_paths = ["/auth/refresh", "/auth/login", "/auth/register", "/favicon.ico", "/auth/verify", "/login"]
         if request.url.path.startswith("/static") or request.url.path in allowed_paths:
             return await call_next(request)
         
@@ -67,11 +68,11 @@ class RefreshMiddleware(BaseHTTPMiddleware):
                     request.state.user_id = user_id
                     return await call_next(request)
             except jwt.ExpiredSignatureError:
-                return RedirectResponse("/refresh")
+                return RedirectResponse("/auth/refresh")
 
         elif refresh_token:
             print("Refresh token found")
-            return RedirectResponse("/refresh")
+            return RedirectResponse("/auth/refresh")
 
         return RedirectResponse("/login")
 
@@ -87,7 +88,8 @@ app.add_middleware(
     allow_headers=["*"],  # Разрешаем все заголовки
 )
 
-app.include_router(router)
+app.include_router(router, prefix="/auth", tags=["auth"])
+app.include_router(router_dash, prefix="/dash", tags=["dashboard"])
 
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 

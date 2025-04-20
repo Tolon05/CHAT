@@ -20,11 +20,3 @@ class Device(Base):
     ip_address = Column(String)
     last_login = Column(DateTime, default=datetime.datetime.now(datetime.timezone.utc))
     user = relationship("User", back_populates="devices")
-
-class EmailCode(Base):
-    __tablename__ = "email_codes"
-    id = Column(Integer, primary_key=True, index=True)
-    email = Column(String)
-    code = Column(String)
-    expires_at = Column(DateTime)
-

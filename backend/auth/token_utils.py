@@ -1,12 +1,12 @@
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from backend.config import settings
-from backend.session_utils import is_refresh_token_blacklisted
+from backend.session_tokens import is_refresh_token_blacklisted
 
 SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-REFRESH_TOKEN_EXPIRE_MINUTES = 1440
+ALGORITHM = settings.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
 
 async def create_access_token(data: dict, expires_delta: timedelta = None):
     to_encode = data.copy()
@@ -59,8 +59,8 @@ async def verify_refresh_token(refresh_token: str) -> int:
     except JWTError:
         return None 
 
-async def get_token_ttl(token: str, algorithm: str = "HS256") -> int:
-    payload = jwt.decode(token, SECRET_KEY, algorithms=[algorithm])
+async def get_token_ttl(token: str) -> int:
+    payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
     exp_timestamp = payload.get("exp")
     if not exp_timestamp:
         raise ValueError("Token does not contain 'exp'")

@@ -9,14 +9,19 @@ from sqlalchemy.orm import Session
 from sqlalchemy.future import select
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.database import SessionLocal, get_db
-from backend.models import User, EmailCode, Device
-from backend.security import hash_password, verify_password
-from backend.tasks import send_verification_email_task
-import random, datetime
-from backend.token_utils import create_access_token, create_refresh_token, verify_refresh_token
-from backend.session_utils import store_access_token, store_refresh_token, get_session, store_verification_code, verify_code
+from backend.database import get_db
+from backend.models.models import User
+from backend.auth.security import hash_password, verify_password
+from backend.celery_tasks.tasks import send_verification_email_task
+import random
+from backend.auth.token_utils import create_access_token, create_refresh_token, verify_refresh_token
+from backend.session_tokens import store_access_token, store_refresh_token, get_session, store_verification_code, verify_code
 from datetime import timedelta
+from backend.config import settings
+
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_MINUTES = settings.REFRESH_TOKEN_EXPIRE_MINUTES
+EMAIL_MINUTES = settings.EMAIL_MINUTE
 
 router = APIRouter()
 
@@ -35,11 +40,11 @@ async def refresh_token(request: Request, response: Response):
         return RedirectResponse("/login")
 
     new_access_token = await create_access_token({"user_id": user_id})
-    expiration_time_access = timedelta(minutes=1)
+    expiration_time_access = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
     await store_access_token(user_id, new_access_token, expiration_time_access)
 
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse("/dash/", status_code=303)
     response.set_cookie(
         key="access_token",
         value=new_access_token,
@@ -65,9 +70,9 @@ async def register(request: Request, username: str = Form(...), email: str = For
         raise HTTPException(status_code=400, detail="Пользователь уже существует")
     print("User does not exist")
 
-    code = str(random.randint(1000, 9999))
+    code = str(random.randint(100000, 999999))
 
-    await store_verification_code(email, code, expires_minutes=5)
+    await store_verification_code(email, code, expires_minutes=EMAIL_MINUTES)
 
     send_verification_email_task.apply_async(args=[email, code])
 
@@ -75,7 +80,7 @@ async def register(request: Request, username: str = Form(...), email: str = For
     request.session["email"] = email
     request.session["password"] = hash_password(password)
     
-    return RedirectResponse("/verify", status_code=303)
+    return RedirectResponse("/auth/verify", status_code=303)
 
 @router.get("/verify", response_class=HTMLResponse)
 async def verify_form(request: Request):
@@ -102,7 +107,7 @@ async def verify(request: Request, code: str = Form(...), db: AsyncSession = Dep
     await db.refresh(user)      
 
     print("✅ Пользователь сохранён:", user)
-    return RedirectResponse("/", status_code=303)
+    return RedirectResponse("/dash/", status_code=303)
 
 @router.post("/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...), db: AsyncSession = Depends(get_db)):
@@ -116,10 +121,10 @@ async def login(request: Request, username: str = Form(...), password: str = For
     access_token = await create_access_token({"user_id": user.id})
     refresh_token = await create_refresh_token({"user_id": user.id})
 
-    expiration_time_refresh = timedelta(minutes=2)
-    expiration_time_access = timedelta(minutes=1)
+    expiration_time_refresh = timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
+    expiration_time_access = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    response = RedirectResponse("/", status_code=303)
+    response = RedirectResponse("/dash/", status_code=303)
     
     response.set_cookie(key="access_token", value=access_token, max_age=expiration_time_access, httponly=True, samesite="Strict") # secure=True,
     response.set_cookie(key="refresh_token", value=refresh_token, max_age=expiration_time_refresh, httponly=True, samesite="Strict")
@@ -127,30 +132,4 @@ async def login(request: Request, username: str = Form(...), password: str = For
     await store_access_token(user.id, access_token, expiration_time_access)
     await store_refresh_token(user.id, refresh_token, expiration_time_refresh)
 
-    return RedirectResponse("/", status_code=303)
-
-@router.get("/", response_class=HTMLResponse)
-async def dashboard(request: Request, db: Session = Depends(get_db)):
-    user_id = request.session.get("user_id")
-    if not user_id:
-        raise HTTPException(status_code=401, detail="Не авторизован")
-
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="Пользователь не найден")
-
-    devices = db.query(Device).filter(Device.user_id == user_id).all()
-
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user": user, "devices": devices})
-
-# @router.post("/add_device")
-# async def add_device(request: Request, device_info: str = Form(...), db: Session = Depends(get_db)):
-#     user_id = request.session.get("user_id")
-#     if not user_id:
-#         raise HTTPException(status_code=401, detail="Не авторизован")
-
-#     device = Device(user_id=user_id, device_info=device_info, ip_address=request.client.host)
-#     db.add(device)
-#     db.commit()
-
-#     return RedirectResponse("/dashboard", status_code=303)
+    return response

@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
-from backend.models import User  # Убедись, что модель User импортируется правильно
+from backend.database.models import User  # Убедись, что модель User импортируется правильно
 
 engine = create_engine("sqlite:///app.db")  # Без async
 

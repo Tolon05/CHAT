@@ -1,6 +1,5 @@
 from celery import Celery
 from backend.config import settings
-from backend.auth.email_utils import send_verification_email
 
 celery = Celery(
     __name__,
@@ -14,4 +13,4 @@ celery.conf.update(
     accept_content=['json'],
 )
 
-celery.autodiscover_tasks(["backend.tasks"])
+celery.autodiscover_tasks(["backend.celery_tasks.tasks"])
