@@ -34,7 +34,25 @@ async def verify_access_token(token: str):
     except jwt.ExpiredSignatureError:
         return None  
     except jwt.JWTError:
-        return None  
+        return None 
+
+from fastapi import Request, HTTPException
+
+async def verify_access_token_for_user_id(request: Request):
+    token = request.cookies.get("access_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="Access token missing")
+
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return user_id
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.JWTError:
+        raise HTTPException(status_code=401, detail="Token is invalid") 
 
 async def verify_refresh_token(refresh_token: str) -> int:
     try:
@@ -73,3 +91,4 @@ async def get_token_ttl(token: str) -> int:
         raise ValueError("Token already expired")
 
     return ttl_seconds + 1
+

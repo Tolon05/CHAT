@@ -41,15 +41,48 @@
                 </div>
             </div>
 
-            <!-- Filter Buttons under Search -->
-            <div class="filter-buttons">
-                <button class="filter-btn active" id="btn-all">Все</button>
-                <button class="filter-btn" id="btn-unread">Непрочитанные</button>
-                <button class="filter-btn" id="btn-groups">Группы</button>
+            <!-- Buttons: Новый контакт / Новая группа -->
+            <div class="contact-actions">
+                <a href="/dash/new_con" class="action-button">
+                    <span class="icon-container"><i class="fas fa-user-plus"></i></span> Новый контакт
+                </a>
+                <a href="/dash/new_group" class="action-button">
+                    <span class="icon-container"><i class="fas fa-users"></i></span> Новая группа
+                </a>
+            </div>
+            
+            <!-- Контакты -->
+            <div class="contact-list">
+                <div class="contact-label">Контакты в ChatsApp</div>
+            
+                {% if contacts %}
+                {% for contact in contacts %}
+                <div class="contact-item">
+                    <div class="contact-avatar">
+                        {% if contact.avatar_url %}
+                        <img src="{{ contact.avatar_url }}" alt="avatar" class="contact-avatar-img">
+                        {% else %}
+                        <!-- Встроенная иконка -->
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"
+                            class="contact-avatar-icon">
+                            <path
+                                d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                        </svg>
+                        {% endif %}
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-name">{{ contact.username }}</div>
+                        <div class="contact-last-msg">—</div> <!-- Можно будет добавить последнее сообщение позже -->
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p>У вас пока нет контактов.</p>
+                {% endif %}
             </div>
 
             <div class="nav-icons">
-                <div class="nav-item" id="nav-chats">
+                <div class="nav-item" id="nav-chatss">
                     <div class="nav-circle">
                         <a href="/dash/">
                             <i class="fas fa-comment-alt"></i>
@@ -70,7 +103,7 @@
                         </a>
                     </div>
                 </div>
-                <div class="nav-item" id="nav-new">
+                <div class="nav-item" id="nav-add-contacts">
                     <div class="nav-circle">
                         <a href="/dash/add_con">
                             <i class="fas fa-user-plus"></i>
@@ -88,71 +121,11 @@
         </div>
 
         <!-- Chat Area -->
-        <div class="chat-area" id="chat-area">
-            <div class="chat-header">
-                <div class="chat-back" id="chat-back">
-                    <i class="fas fa-arrow-left"></i>
-                </div>
-                <div class="chat-title" id="current-chat-title">Select a chat</div>
-                <div class="chat-actions">
-                    <i class="fas fa-search"></i>
-                    <i class="fas fa-ellipsis-v"></i>
-                </div>
-            </div>
-
-            <div class="message-list" id="message-list">
-                <!-- Messages will be loaded here -->
-                <div class="loading">Select a chat to view messages</div>
-            </div>
-
-            <div class="message-input-area">
-                <div class="input-actions">
-                    <i class="far fa-smile"></i>
-                    <i class="fas fa-paperclip"></i>
-                </div>
-                <div class="message-input">
-                    <input type="text" id="message-input" placeholder="Type a message" disabled>
-                </div>
-                <i class="fas fa-microphone"></i>
-            </div>
-        </div>
+        <div class="chat-area-con" id="chat-area-con"></div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async function () {
-
-            // Кнопки фильтра
-            const btnAll = document.getElementById('btn-all');
-            const btnUnread = document.getElementById('btn-unread');
-            const btnGroups = document.getElementById('btn-groups');
-
-            // Установить активную кнопку фильтра
-            async function setActiveFilterBtn(activeBtn) {
-                const filterBtns = [btnAll, btnUnread, btnGroups];
-                filterBtns.forEach(btn => {
-                    if (btn) btn.classList.remove('active');
-                });
-                if (activeBtn) activeBtn.classList.add('active');
-            }
-
-            // Фильтрация чатов
-            btnAll?.addEventListener('click', async () => {
-                await setActiveFilterBtn(btnAll);
-                // Логика отображения всех чатов
-            });
-
-            btnUnread?.addEventListener('click', async () => {
-                await setActiveFilterBtn(btnUnread);
-                // Логика отображения только непрочитанных
-            });
-
-            btnGroups?.addEventListener('click', async () => {
-                await setActiveFilterBtn(btnGroups);
-                // Логика отображения только групп
-            });
-
-            await setActiveFilterBtn(btnAll);
-        });
+        document.addEventListener('DOMContentLoaded', async function () { });
     </script>
 </body>
 

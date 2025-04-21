@@ -51,37 +51,27 @@
             <div class="nav-icons">
                 <div class="nav-item" id="nav-chats">
                     <div class="nav-circle">
-                        <a href="/dash/">
-                            <i class="fas fa-comment-alt"></i>
-                        </a>
+                        <i class="fas fa-comment-alt"></i>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-status">
                     <div class="nav-circle">
-                        <a href="/status">
-                            <i class="fas fa-video"></i>
-                        </a>
+                        <i class="fas fa-video"></i>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-favorites">
                     <div class="nav-circle">
-                        <a href="/favorites">
-                            <i class="fas fa-star"></i>
-                        </a>
+                        <i class="fas fa-star"></i>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-new">
                     <div class="nav-circle">
-                        <a href="/dash/add_con">
-                            <i class="fas fa-user-plus"></i>
-                        </a>
+                        <i class="fas fa-user-plus"></i>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-profile">
                     <div class="nav-circle">
-                        <a href="/profile">
-                            <i class="fas fa-user"></i>
-                        </a>
+                        <i class="fas fa-user"></i>
                     </div>
                 </div>
             </div>
@@ -99,12 +89,12 @@
                     <i class="fas fa-ellipsis-v"></i>
                 </div>
             </div>
-
+        
             <div class="message-list" id="message-list">
                 <!-- Messages will be loaded here -->
                 <div class="loading">Select a chat to view messages</div>
             </div>
-
+        
             <div class="message-input-area">
                 <div class="input-actions">
                     <i class="far fa-smile"></i>
@@ -120,11 +110,47 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async function () {
+            // Навигационные элементы
+            const navChats = document.getElementById('nav-chats');
+            const navGroups = document.getElementById('nav-status');
+            const navCalls = document.getElementById('nav-favorites');
+            const navSaved = document.getElementById('nav-new');
+            const navProfile = document.getElementById('nav-profile');
+
+            // Контент по секциям
+            const chatContent = document.getElementById('chats-content');
+            const groupsContent = document.getElementById('groups-content');
+            const callsContent = document.getElementById('calls-content');
+            const savedContent = document.getElementById('saved-content');
+            const profileContent = document.getElementById('profile-content');
 
             // Кнопки фильтра
             const btnAll = document.getElementById('btn-all');
             const btnUnread = document.getElementById('btn-unread');
             const btnGroups = document.getElementById('btn-groups');
+
+            // Скрыть весь контент
+            async function hideAllContent() {
+                const contents = [chatContent, groupsContent, callsContent, savedContent, profileContent];
+                contents.forEach(content => {
+                    if (content) content.style.display = 'none';
+                });
+            }
+
+            // Показать нужный контент
+            async function switchContent(contentToShow) {
+                await hideAllContent();
+                if (contentToShow) contentToShow.style.display = 'block';
+            }
+
+            // Установить активную иконку в сайдбаре
+            async function setActiveNavIcon(activeIcon) {
+                const navIcons = [navChats, navGroups, navCalls, navSaved, navProfile];
+                navIcons.forEach(icon => {
+                    if (icon) icon.classList.remove('active');
+                });
+                if (activeIcon) activeIcon.classList.add('active');
+            }
 
             // Установить активную кнопку фильтра
             async function setActiveFilterBtn(activeBtn) {
@@ -134,6 +160,32 @@
                 });
                 if (activeBtn) activeBtn.classList.add('active');
             }
+
+            // Навигационные обработчики
+            navChats?.addEventListener('click', async () => {
+                await switchContent(chatContent);
+                await setActiveNavIcon(navChats);
+            });
+
+            navGroups?.addEventListener('click', async () => {
+                await switchContent(groupsContent);
+                await setActiveNavIcon(navGroups);
+            });
+
+            navCalls?.addEventListener('click', async () => {
+                await switchContent(callsContent);
+                await setActiveNavIcon(navCalls);
+            });
+
+            navSaved?.addEventListener('click', async () => {
+                await switchContent(savedContent);
+                await setActiveNavIcon(navSaved);
+            });
+
+            navProfile?.addEventListener('click', async () => {
+                await switchContent(profileContent);
+                await setActiveNavIcon(navProfile);
+            });
 
             // Фильтрация чатов
             btnAll?.addEventListener('click', async () => {
@@ -151,6 +203,9 @@
                 // Логика отображения только групп
             });
 
+            // Загрузка по умолчанию
+            await switchContent(chatContent);
+            await setActiveNavIcon(navChats);
             await setActiveFilterBtn(btnAll);
         });
     </script>

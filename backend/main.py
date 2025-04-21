@@ -59,6 +59,7 @@ class RefreshMiddleware(BaseHTTPMiddleware):
         
         access_token = request.cookies.get("access_token")
         refresh_token = request.cookies.get("refresh_token")
+        print("what what", access_token, refresh_token)
 
         if access_token:
             print("Access token found")
@@ -95,6 +96,10 @@ app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "frontend", "templates"))
+
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    return RedirectResponse("/dash/")
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_form(request: Request):
