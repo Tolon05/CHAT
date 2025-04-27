@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import UUID, Column, Integer, String, Boolean, DateTime, ForeignKey, PrimaryKeyConstraint, Text
+from sqlalchemy import UUID, Column, LargeBinary, Integer, String, Boolean, DateTime, ForeignKey, PrimaryKeyConstraint, Text
 from sqlalchemy.orm import relationship
 from backend.database import Base
 from datetime import datetime, timezone
@@ -12,6 +12,9 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     hashed_password = Column(String)
     is_verified = Column(Boolean, default=False)
+    avatar_data = Column(LargeBinary, nullable=True)
+    about = Column(String, nullable=True)
+    status = Column(String, nullable=True)
 
     devices = relationship("Device", back_populates="user", cascade="all, delete")
     my_contacts = relationship("Contact", foreign_keys="[Contact.owner_id]", back_populates="owner", cascade="all, delete")
@@ -103,15 +106,15 @@ class Message(Base):
     sender = relationship("User", back_populates="messages")
     room = relationship("ChatRoom", back_populates="messages")
     
-class Message(Base):
-    __tablename__ = "messages"
+# class Message(Base):
+#     __tablename__ = "messages"
 
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id"))
-    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
-    content_encrypted = Column(Text, nullable=False)
-    sent_at = Column(DateTime, default=datetime.now(timezone.utc))
-    read = Column(Boolean, default=False)
+#     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+#     room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id"))
+#     sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+#     content_encrypted = Column(Text, nullable=False)
+#     sent_at = Column(DateTime, default=datetime.now(timezone.utc))
+#     read = Column(Boolean, default=False)
 
 class UserKey(Base):
     __tablename__ = "user_keys"
