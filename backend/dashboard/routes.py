@@ -17,6 +17,7 @@ from sqlalchemy.sql import exists
 from pathlib import Path
 import shutil
 import base64
+from datetime import datetime
 
 router_dash = APIRouter()
 
@@ -28,6 +29,10 @@ def b64encode_filter(value: bytes) -> str:
 
 # Регистрируем собственный фильтр
 templates.env.filters['b64encode'] = b64encode_filter
+
+from sqlalchemy.orm import aliased
+from sqlalchemy.sql import select, and_, or_, exists
+from fastapi import HTTPException
 
 @router_dash.get("/", response_class=HTMLResponse)
 async def dashboard(
@@ -42,21 +47,78 @@ async def dashboard(
     selected_contact = None
     contact_data_dict = {}
 
+    # Обработка выбранного контакта
     if selected_contact_id:
-        selected_contact_result = await db.execute(
-            select(Contact, User)
-            .join(User, User.id == Contact.contact_id)
-            .where(Contact.id == selected_contact_id)
-        )
-        selected_contact = selected_contact_result.first()  # (Contact, User)
+        # Создаем псевдоним для таблицы RoomParticipant
+        rp2 = aliased(RoomParticipant, name='rp2')
 
+        # Подзапрос для получения ID приватной комнаты
+        subquery = (
+            select(ChatRoom.id)
+            .join(RoomParticipant, RoomParticipant.room_id == ChatRoom.id)
+            .where(
+                and_(
+                    ChatRoom.type == "private",
+                    RoomParticipant.user_id == current_user_id
+                )
+            )
+            .join(
+                rp2, 
+                and_(
+                    rp2.room_id == ChatRoom.id,
+                    rp2.user_id == Contact.contact_id
+                )
+            )
+            .where(Contact.id == selected_contact_id, Contact.owner_id == current_user_id)
+            .correlate(Contact)
+            .scalar_subquery()  # Преобразуем в скалярный подзапрос
+        )
+
+        # Основной запрос для получения контакта, пользователя и комнаты
+        selected_contact_result = await db.execute(
+            select(Contact, User, ChatRoom)
+            .join(User, User.id == Contact.contact_id)
+            .outerjoin(
+                ChatRoom, 
+                and_(
+                    ChatRoom.id == subquery,  # Используем скалярный подзапрос
+                    ChatRoom.type == "private"
+                )
+            )
+            .where(Contact.id == selected_contact_id, Contact.owner_id == current_user_id)
+        )
+        selected_contact = selected_contact_result.first()  # (Contact, User, ChatRoom)
+
+        # Если контакт не найден
+        if selected_contact_id and not selected_contact:
+            raise HTTPException(status_code=404, detail="Contact not found")
+
+        # Если комната не найдена, создаем новую приватную комнату
+        if selected_contact and not selected_contact[2]:  # ChatRoom отсутствует
+            contact_obj, user_obj, _ = selected_contact
+            # Создаем новую комнату
+            new_room = ChatRoom(type="private")
+            db.add(new_room)
+            await db.commit()
+            await db.refresh(new_room)
+
+            # Добавляем участников (текущий пользователь и контакт)
+            participant1 = RoomParticipant(room_id=new_room.id, user_id=current_user_id)
+            participant2 = RoomParticipant(room_id=new_room.id, user_id=user_obj.id)
+            db.add_all([participant1, participant2])
+            await db.commit()
+
+            # Обновляем selected_contact с новой комнатой
+            selected_contact = (contact_obj, user_obj, new_room)
+
+    # Запрос для получения всех чатов и контактов
     result = await db.execute(
         select(ChatRoom, User)
         .select_from(ChatRoom)
         .outerjoin(RoomParticipant, RoomParticipant.room_id == ChatRoom.id)
         .outerjoin(Message, Message.room_id == ChatRoom.id)
-        .outerjoin(Contact, and_(Contact.owner_id == current_user_id))  
-        .outerjoin(User, User.id == Contact.contact_id)  
+        .outerjoin(Contact, and_(Contact.owner_id == current_user_id))
+        .outerjoin(User, User.id == Contact.contact_id)
         .where(
             or_(
                 and_(
@@ -74,13 +136,12 @@ async def dashboard(
 
     chats_with_contacts = result.all()
 
+    # Обработка данных для шаблона
     if selected_contact:
-        contact_obj, user_obj = selected_contact
-
+        contact_obj, user_obj, room_obj = selected_contact
         user_ids = {user.id for room, user in chats_with_contacts if user}
         if user_obj.id not in user_ids:
-            chats_with_contacts.insert(0, (None, user_obj))
-
+            chats_with_contacts.insert(0, (room_obj, user_obj))
         contact_data_dict[user_obj.id] = user_obj
 
     return templates.TemplateResponse(
@@ -89,9 +150,10 @@ async def dashboard(
             "request": request,
             "contacts": chats_with_contacts,
             "selected_contact": selected_contact,
-            "selected_contact_user": selected_contact[1],
-            "contact_data_dict": contact_data_dict, 
-        }, 
+            "selected_contact_user": selected_contact[1] if selected_contact else None,
+            "selected_contact_room": selected_contact[2] if selected_contact else None,
+            "contact_data_dict": contact_data_dict,
+        },
         response=response
     )
 
@@ -117,8 +179,10 @@ async def add_contact(
     session: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(verify_access_token_for_user_id)
 ):
+    # Создаем алиас для таблицы Contact
     ContactAlias = aliased(Contact)
 
+    # Выполняем запрос для получения пользователя и проверки контакта
     result = await session.execute(
         select(User, ContactAlias)
         .outerjoin(
@@ -135,15 +199,32 @@ async def add_contact(
 
     target_user, existing_contact = row
 
+    # Проверяем, что пользователь не добавляет сам себя
     if target_user.id == current_user_id:
         raise HTTPException(status_code=400, detail="Нельзя добавить себя в контакты")
 
+    # Проверяем, что контакт еще не добавлен
     if existing_contact:
         raise HTTPException(status_code=400, detail="Контакт уже добавлен")
 
+    # Создаем новый контакт
     contact = Contact(owner_id=current_user_id, contact_id=target_user.id)
     session.add(contact)
-    await session.commit()
+
+    # Создаем приватную комнату для чата
+    room = ChatRoom(name=f"Chat with {target_user.username}", type="private")
+    session.add(room)
+    await session.commit()  # Сохраняем комнату
+    await session.refresh(room)  # Обновляем объект room для получения id
+
+    # Добавляем участников комнаты
+    # Используем target_user.id напрямую, но сначала убеждаемся, что объект не expired
+    await session.refresh(target_user)  # Обновляем объект target_user
+    room_participant_1 = RoomParticipant(user_id=current_user_id, room_id=room.id)
+    room_participant_2 = RoomParticipant(user_id=target_user.id, room_id=room.id)
+    session.add(room_participant_1)
+    session.add(room_participant_2)
+    await session.commit()  # Сохраняем участников
 
     return RedirectResponse(url="/dash/new_con", status_code=303)
 

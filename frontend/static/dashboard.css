@@ -337,6 +337,23 @@ body {
         /* Цвет иконки */
 }
 
+/* .contact-item-selected {
+    background-color: #2a9df4;
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(42, 157, 244, 0.4);
+    transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+.contact-item-selected .contact-name,
+.contact-item-selected .contact-last-msg {
+    color: white;
+}
+
+.contact-item-selected .contact-avatar-icon {
+    fill: white;
+} */
+
 .contact-item:hover {
     background-color: #3C5952;
     /* Подсветка при наведении */
@@ -636,6 +653,20 @@ body {
 .message-input input::placeholder {
     color: rgba(255, 255, 255, 0.5);
     opacity: 1;
+}
+
+.send-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 20px;
+    color: #007bff;
+    /* Цвет для иконки */
+    transition: transform 0.3s;
+}
+
+.send-button:hover {
+    transform: scale(1.2);
 }
 
 .icon-left {

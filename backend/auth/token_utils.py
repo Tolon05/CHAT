@@ -92,3 +92,15 @@ async def get_token_ttl(token: str) -> int:
 
     return ttl_seconds + 1
 
+async def verify_access_token_for_user_id_ws(token: str) -> int:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id: int = payload.get("sub")
+
+        if user_id is None:
+            raise HTTPException(status_code=401, detail="Token payload invalid")
+
+        return int(user_id)
+
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Token verification failed: {str(e)}")

@@ -130,6 +130,7 @@ async def login(
     access_token = await create_access_token({"user_id": user.id})
     refresh_token = await create_refresh_token({"user_id": user.id})
 
+
     expiration_time_refresh = timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     expiration_time_access = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
@@ -142,6 +143,7 @@ async def login(
     # Формируем ответ
     response = JSONResponse(content={
         "message": "Login successful",
+        "access_token": access_token, 
         "encryptedPrivateKey": user.user_keys.encrypted_private_key if user.user_keys else None
     })
 
@@ -160,5 +162,4 @@ async def login(
         httponly=True,
         samesite="Strict"
     )
-
     return response

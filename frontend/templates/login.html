@@ -74,6 +74,87 @@
 
     <script src="/static/app.js"></script>
     <script>
+        document.getElementById('login-form').addEventListener('submit', async function (event) {
+            event.preventDefault(); // Останавливаем стандартную отправку формы
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const formData = new FormData();
+                formData.append("username", username);
+                formData.append("password", password);
+
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const encryptedPrivateKey = data.encryptedPrivateKey;
+                    const accessToken = data.access_token;
+
+                    // Сохраняем ключ и токен
+                    await saveKeysAndToken(encryptedPrivateKey, accessToken);
+
+                    alert('Login successful and keys saved!');
+                    window.location.href = '/dash/'; // Переход на дашборд
+                } else {
+                    const errorData = await response.json();
+                    alert(`Login failed: ${errorData.message}`);
+                }
+            } catch (error) {
+                console.error('Ошибка входа:', error);
+                alert('Произошла ошибка при попытке входа: ' + error);
+            }
+        });
+
+        // Функция для сохранения ключа и токена в IndexedDB
+        async function saveKeysAndToken(encryptedPrivateKey, token) {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open("userKeysDB", 2); // ВАЖНО: версия 2!
+
+                request.onupgradeneeded = function (event) {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains("keys")) {
+                        db.createObjectStore("keys", { keyPath: "id" });
+                    }
+                    if (!db.objectStoreNames.contains("tokens")) {
+                        db.createObjectStore("tokens", { keyPath: "id" });
+                    }
+                };
+
+                request.onsuccess = function (event) {
+                    const db = event.target.result;
+                    const transaction = db.transaction(["keys", "tokens"], "readwrite");
+
+                    transaction.onerror = function (event) {
+                        console.error('Transaction error:', event.target.error);
+                        reject('Ошибка транзакции IndexedDB');
+                    };
+
+                    const keysStore = transaction.objectStore("keys");
+                    const tokensStore = transaction.objectStore("tokens");
+
+                    keysStore.put({ id: 1, encryptedPrivateKey: encryptedPrivateKey });
+                    tokensStore.put({ id: 1, token: token });
+
+                    transaction.oncomplete = function () {
+                        console.log("Ключ и токен успешно сохранены в IndexedDB");
+                        resolve();
+                    };
+                };
+
+                request.onerror = function (event) {
+                    console.error('IndexedDB open error:', event.target.error);
+                    reject('Ошибка открытия базы IndexedDB');
+                };
+            });
+        }
+    </script>
+
+    <!-- <script>
         // Добавляем обработку формы через JavaScript
         document.getElementById('login-form').addEventListener('submit', async function (event) {
             event.preventDefault();  // Предотвращаем стандартную отправку формы
@@ -95,10 +176,13 @@
                 if (response.ok) {
                     const data = await response.json();
                     const encryptedPrivateKey = data.encryptedPrivateKey;
+                    const accessToken = data.access_token;  // Получаем access_token
 
-                    // Сохраняем ключ в IndexedDB
+                    // Сохраняем ключ и токен в IndexedDB
                     await savePrivateKeyToIndexedDB(encryptedPrivateKey);
-                    alert('Login successful and private key saved!');
+                    await saveTokenToIndexedDB(accessToken);
+
+                    alert('Login successful and private key & access token saved!');
                     window.location.href = '/dash/';  // Перенаправляем на дашборд
                 } else {
                     const errorData = await response.json();
@@ -112,39 +196,71 @@
 
         // Функция для сохранения данных в IndexedDB (асинхронная версия)
         async function savePrivateKeyToIndexedDB(encryptedPrivateKey) {
-            const request = indexedDB.open("userKeysDB", 1);
+            const db = await openDatabase();  // Открываем IndexedDB
 
             return new Promise((resolve, reject) => {
-                request.onupgradeneeded = function (event) {
+                const transaction = db.transaction(["keys"], "readwrite");
+                const store = transaction.objectStore("keys");
+
+                store.put({ id: 1, encryptedPrivateKey: encryptedPrivateKey });
+
+                transaction.oncomplete = () => {
+                    console.log("Private key saved to IndexedDB");
+                    resolve();
+                };
+
+                transaction.onerror = () => {
+                    reject("Error saving private key to IndexedDB");
+                };
+            });
+        }
+
+        // Функция для сохранения access_token в IndexedDB
+        async function saveTokenToIndexedDB(token) {
+            const db = await openDatabase();  // Открываем IndexedDB
+
+            return new Promise((resolve, reject) => {
+                const transaction = db.transaction(["tokens"], "readwrite");
+                const store = transaction.objectStore("tokens");
+
+                store.put({ key: "access_token", token: token });
+
+                transaction.oncomplete = () => {
+                    console.log("Access token saved to IndexedDB");
+                    resolve();
+                };
+
+                transaction.onerror = () => {
+                    reject("Error saving access token to IndexedDB");
+                };
+            });
+        }
+
+        // Функция для открытия IndexedDB (если не создана)
+        function openDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('myDatabase', 1);
+
+                request.onupgradeneeded = (event) => {
                     const db = event.target.result;
-                    if (!db.objectStoreNames.contains("keys")) {
-                        db.createObjectStore("keys", { keyPath: "id", autoIncrement: true });
+                    if (!db.objectStoreNames.contains('keys')) {
+                        db.createObjectStore('keys', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('tokens')) {
+                        db.createObjectStore('tokens', { keyPath: 'key' });
                     }
                 };
 
-                request.onsuccess = function (event) {
-                    const db = event.target.result;
-                    const transaction = db.transaction("keys", "readwrite");
-                    const store = transaction.objectStore("keys");
-
-                    store.put({ id: 1, encryptedPrivateKey: encryptedPrivateKey });
-
-                    transaction.oncomplete = function () {
-                        console.log("Private key saved to IndexedDB");
-                        resolve();
-                    };
-
-                    transaction.onerror = function () {
-                        reject('Error saving private key to IndexedDB');
-                    };
+                request.onsuccess = (event) => {
+                    resolve(event.target.result);
                 };
 
-                request.onerror = function (event) {
+                request.onerror = (event) => {
                     reject(`Error opening IndexedDB: ${event.target.error}`);
                 };
             });
         }
-    </script>
+    </script> -->
 </body>
 
 </html>

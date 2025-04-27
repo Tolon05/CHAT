@@ -94,6 +94,17 @@ class GroupSettings(Base):
 
     room = relationship("ChatRoom", back_populates="group_settings")
 
+class MessageReadStatus(Base):
+    __tablename__ = "message_read_status"
+
+    message_id = Column(Integer, ForeignKey("messages.id"), primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    read_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    message = relationship("Message", back_populates="read_status")
+    user = relationship("User")
+
+# В модели Message добавляем связь с таблицей прочтений
 class Message(Base):
     __tablename__ = "messages"
 
@@ -102,6 +113,7 @@ class Message(Base):
     room_id = Column(Integer, ForeignKey("chat_rooms.id"), index=True)
     content = Column(String)
     timestamp = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    read_status = relationship("MessageReadStatus", back_populates="message", cascade="all, delete")
 
     sender = relationship("User", back_populates="messages")
     room = relationship("ChatRoom", back_populates="messages")
