@@ -285,14 +285,6 @@ body {
     outline: none;
 }
 
-.contact-label {
-    font-size: 14px;
-    color: #FFFFFF;
-    padding: 8px 20px;
-    /* font-weight: bold; */
-    margin-bottom: 10px;
-}
-
 .contact-list {
     /* overflow-y: auto; */
     /* max-height: calc(100vh - 420px); */
@@ -435,7 +427,7 @@ body {
 .chat-header {
     display: flex;
     justify-content: space-between;
-    height: 60px;
+    height: 80px;
 }
 
 .chat-name {
@@ -532,11 +524,12 @@ body {
     display: flex;
     gap: 20px;
     color: var(--light-text);
+    /* margin-right: 10px; */
 }
 
 .chat-actions i {
     cursor: pointer;
-    font-size: 20px;
+    /* font-size: 20px; */
 }
 
 .message-list {
@@ -586,40 +579,98 @@ body {
 }
 
 .message-input-area {
-    padding: 10px 16px;
+    /* padding: 10px 16px;
     background-color: #386158;
     display: flex;
     align-items: center;
-    gap: 10px;
-}
-
-.input-actions {
+    gap: 10px; */
     display: flex;
-    gap: 10px;
-    color: var(--light-text);
-    font-size: 20px;
-}
-
-.input-actions i {
-    cursor: pointer;
-    font-size: 24px;
+    justify-content: flex-end;
+    align-items: center;
+    padding: 10px 50px;
 }
 
 .message-input {
+    position: relative;
+    width: 900px;
+    background-color: #488376;
+    border: 2px solid white;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    padding: 8px 50px;
+}
+
+/* .message-input {
     flex: 1;
     display: flex;
     align-items: center;
     background-color: #ffffff;
-    border-radius: 8px;
+    border-radius: 20px;
+} */
+
+/* .message-input i {
+    cursor: pointer;
+    font-size: 24px;
 }
 
 .message-input input {
+    background-color: #488376;
     width: 100%;
     padding: 10px 15px;
     border-radius: 8px;
     border: none;
     outline: none;
     font-size: 15px;
+} */
+
+.message-input input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 18px;
+    color: white;
+}
+
+.message-input input::placeholder {
+    color: rgba(255, 255, 255, 0.5);
+    opacity: 1;
+}
+
+.icon-left {
+    position: absolute;
+    left: 10px;
+    font-size: 25px;
+    color: white;
+}
+
+.icon-right {
+    position: absolute;
+    right: 20px;
+    font-size: 25px;
+    color: white;
+    cursor: pointer;
+}
+
+.actions {
+    margin-left: 15px;
+    display: flex;
+    gap: 15px;
+}
+
+.actions i {
+    font-size: 25px;
+    color: white;
+    /* background-color: #488376; */
+    /* padding: 10px; */
+    /* border-radius: 50%; */
+    cursor: pointer;
+    display: none;
+}
+
+.actions i.active {
+    display: inline-block;
 }
 
 /* Bottom Navigation */

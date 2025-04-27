@@ -17,6 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from backend.config import settings
 from backend.auth.token_utils import verify_access_token
+from backend.websock.websocket_routes import router_ws
 
 
 
@@ -91,6 +92,7 @@ app.add_middleware(
 
 app.include_router(router, prefix="/auth", tags=["auth"])
 app.include_router(router_dash, prefix="/dash", tags=["dashboard"])
+app.include_router(router_ws)
 
 app.mount("/static", StaticFiles(directory="frontend/static"), name="static")
 

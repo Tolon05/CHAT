@@ -57,7 +57,7 @@
             
                 {% if contacts %}
                 {% for contact in contacts %}
-                <div class="contact-item">
+                <div class="contact-item" data-contact-id="{{ contact.id }}">
                     <div class="contact-avatar">
                         {% if contact.avatar_url %}
                         <img src="{{ contact.avatar_url }}" alt="avatar" class="contact-avatar-img">
@@ -125,7 +125,24 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async function () { });
+        document.addEventListener('DOMContentLoaded', function () {
+            // Находим все элементы контактов
+            const contactItems = document.querySelectorAll('.contact-item');
+
+            // Добавляем обработчик клика для каждого контакта
+            contactItems.forEach(contactItem => {
+                contactItem.addEventListener('click', function () {
+                    // Получаем ID контакта из атрибута data-contact-id
+                    const contactId = contactItem.getAttribute('data-contact-id');
+
+                    // Формируем URL для перехода на страницу чата
+                    const chatUrl = `/dash/?selected_contact_id=${contactId}`;
+
+                    // Выполняем переход
+                    window.location.href = chatUrl;
+                });
+            });
+        });
     </script>
 </body>
 

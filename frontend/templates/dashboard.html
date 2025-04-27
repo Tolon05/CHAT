@@ -48,6 +48,36 @@
                 <button class="filter-btn" id="btn-groups">Группы</button>
             </div>
 
+            <div class="contact-list">
+                {% if contacts %}
+                {% for contact in contacts %}
+                {% set room, user = contact %}
+                {% set contact_obj = contact_data_dict.get(user.id) if user else None %}
+                <div class="contact-item {% if selected_contact and contact_obj and selected_contact[0].id == contact_obj.id %}selected{% endif %}"
+                    data-contact-id="{{ contact_obj.id if contact_obj else '' }}">
+                    <div class="contact-avatar">
+                        {% if contact_obj and contact_obj.avatar_url %}
+                        <img src="{{ contact_obj.avatar_url }}" alt="avatar" class="contact-avatar-img">
+                        {% else %}
+                        <!-- Иконка по умолчанию -->
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"
+                            class="contact-avatar-icon">
+                            <path
+                                d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                        </svg>
+                        {% endif %}
+                    </div>
+                    <div class="contact-info">
+                        <div class="contact-name">{{ user.username if user else 'No user' }}</div>
+                        <div class="contact-last-msg">—</div>
+                    </div>
+                </div>
+                {% endfor %}
+                {% else %}
+                <p class="po-umol" style="color: white; padding: 8px 14px; font-size: 18;">У вас пока нет контактов.</p>
+                {% endif %}
+            </div>
+
             <div class="nav-icons">
                 <div class="nav-item" id="nav-chats">
                     <div class="nav-circle">
@@ -79,7 +109,7 @@
                 </div>
                 <div class="nav-item" id="nav-profile">
                     <div class="nav-circle">
-                        <a href="/profile">
+                        <a href="/dash/profile">
                             <i class="fas fa-user"></i>
                         </a>
                     </div>
@@ -87,16 +117,48 @@
             </div>
         </div>
 
+        <div class="chat-area-con" id="chat-area-con"></div>
+
         <!-- Chat Area -->
         <div class="chat-area" id="chat-area">
             <div class="chat-header">
                 <div class="chat-back" id="chat-back">
                     <i class="fas fa-arrow-left"></i>
                 </div>
-                <div class="chat-title" id="current-chat-title">Select a chat</div>
+            
+                <!-- Добавлен блок с аватаром, именем и статусом -->
+                <div class="chat-info" style="display: flex; align-items: center; gap: 10px;">
+                    <!-- Аватар -->
+                    <img src="https://via.placeholder.com/40" alt="avatar"
+                        style="width: 40px; height: 40px; border-radius: 50%; object-fit: cover; margin-left: 20px;">
+            
+                    <!-- Имя и статус -->
+                    <div style="display: flex; flex-direction: column;">
+                        <div class="chat-title" id="current-chat-title" style="font-weight: bold;">{% if selected_contact %}
+                        {{ selected_contact[1].username }}
+                        {% else %}
+                        Выберите контакт
+                        {% endif %}
+                        </div>
+                        <div id="chat-status" style="font-size: 12px; color: lightgray;"></div>
+                    </div>
+                </div>
+            
                 <div class="chat-actions">
-                    <i class="fas fa-search"></i>
-                    <i class="fas fa-ellipsis-v"></i>
+                    <i style="margin-top: 8px;">
+                        <svg width="25" height="25" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path fill-rule="evenodd" clip-rule="evenodd"
+                                d="M0 11.2511C0 17.464 5.05263 22.5005 11.3684 22.5005C13.8947 22.5005 16.2406 21.6204 18.2256 20.1422C18.2256 20.294 18.406 20.4349 18.406 20.5614L27.4286 29.5609C27.9699 30.1464 29.0526 30.1464 29.594 29.5609C30.1353 28.9754 30.1353 28.0248 29.594 27.4393L20.5714 18.4399C20.391 18.3134 20.391 18.2158 20.2105 18.1435C21.6541 16.2388 22.5564 13.848 22.5564 11.2511C22.5564 5.03644 17.5038 0 11.3684 0C5.05263 0 0 5.03644 0 11.2511ZM3.06836 11.2511C3.06836 6.69354 6.67738 2.99979 11.3691 2.99979C15.8804 2.99979 19.4894 6.69354 19.4894 11.2511C19.4894 15.8069 15.8804 19.5006 11.3691 19.5006C6.67738 19.5006 3.06836 15.8069 3.06836 11.2511Z"
+                                fill="white" />
+                        </svg>
+                    </i>
+                    <i>
+                        <svg width="40" height="40" viewBox="0 0 50 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path
+                                d="M25.0002 20C27.2918 20 29.1668 17.75 29.1668 15C29.1668 12.25 27.2918 10 25.0002 10C22.7085 10 20.8335 12.25 20.8335 15C20.8335 17.75 22.7085 20 25.0002 20ZM25.0002 25C22.7085 25 20.8335 27.25 20.8335 30C20.8335 32.75 22.7085 35 25.0002 35C27.2918 35 29.1668 32.75 29.1668 30C29.1668 27.25 27.2918 25 25.0002 25ZM25.0002 40C22.7085 40 20.8335 42.25 20.8335 45C20.8335 47.75 22.7085 50 25.0002 50C27.2918 50 29.1668 47.75 29.1668 45C29.1668 42.25 27.2918 40 25.0002 40Z"
+                                fill="white" />
+                        </svg>
+                    </i>
                 </div>
             </div>
 
@@ -106,36 +168,109 @@
             </div>
 
             <div class="message-input-area">
-                <div class="input-actions">
-                    <i class="far fa-smile"></i>
-                    <i class="fas fa-paperclip"></i>
-                </div>
                 <div class="message-input">
-                    <input type="text" id="message-input" placeholder="Type a message" disabled>
+                    <i class="far fa-smile icon-left"></i>
+                    <input type="text" id="message-input" placeholder="Enter the message">
+                    <i class="fas fa-paperclip icon-right"></i>
                 </div>
-                <i class="fas fa-microphone"></i>
+                <div class="actions">
+                    <i class="fas fa-microphone" id="mic-icon" class="active"></i>
+                    <i class="fas fa-paper-plane" id="send-icon"></i>
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', async function () {
+        const input = document.getElementById("message-input");
+        const micIcon = document.getElementById("mic-icon");
+        const sendIcon = document.getElementById("send-icon");
 
-            // Кнопки фильтра
+        input.addEventListener("input", () => {
+            if (input.value.trim() !== "") {
+                sendIcon.classList.add("active");
+                micIcon.classList.remove("active");
+            } else {
+                sendIcon.classList.remove("active");
+                micIcon.classList.add("active");
+            }
+        });
+
+        micIcon.classList.add("active");
+
+        const onlineUsers = new Set();
+        const userId = "{{ request.state.user_id }}";
+
+        let ws;
+        if (userId) {
+            ws = new WebSocket(`ws://localhost:8000/ws/online/${userId}`);
+
+            ws.onopen = () => {
+                console.log("Соединение установлено, пользователь в сети");
+            };
+
+            ws.onmessage = async function (event) {
+                const data = JSON.parse(event.data);
+                console.log("Получено сообщение: ", data);
+
+                const urlParams = new URLSearchParams(window.location.search);
+                const selectedContactId = urlParams.get('selected_contact_id');
+
+                if (data.event === "online_users_list") {
+                    onlineUsers.clear();
+                    data.users.forEach(id => onlineUsers.add(String(id)));
+                    await updateStatus(selectedContactId);
+                }
+
+                if (data.event === "user_online") {
+                    onlineUsers.add(String(data.user_id));
+                    await updateStatus(selectedContactId);
+                }
+
+                if (data.event === "user_offline") {
+                    onlineUsers.delete(String(data.user_id));
+                    await updateStatus(selectedContactId);
+                }
+            };
+
+            ws.onclose = () => {
+                console.log("Соединение закрыто");
+            };
+        } else {
+            console.log("Ошибка: ID пользователя не найден");
+        }
+
+        async function updateStatus(selectedContactId) {
+            if (selectedContactId) {
+                const selectedContact = document.querySelector(`.contact-item[data-contact-id="${selectedContactId}"]`);
+                const statusElement = document.getElementById('chat-status');
+
+                if (selectedContact && statusElement) {
+                    if (onlineUsers.has(selectedContactId)) {
+                        statusElement.innerText = "в сети";
+                    } else {
+                        statusElement.innerText = "оффлайн";
+                    }
+                }
+            }
+        }
+
+        let selectedContact = null;
+
+        document.addEventListener('DOMContentLoaded', async function () {
             const btnAll = document.getElementById('btn-all');
             const btnUnread = document.getElementById('btn-unread');
             const btnGroups = document.getElementById('btn-groups');
 
-            // Установить активную кнопку фильтра
+            const chatAreaCon = document.getElementById('chat-area-con');
+            const chatArea = document.getElementById('chat-area');
+
             async function setActiveFilterBtn(activeBtn) {
                 const filterBtns = [btnAll, btnUnread, btnGroups];
-                filterBtns.forEach(btn => {
-                    if (btn) btn.classList.remove('active');
-                });
-                if (activeBtn) activeBtn.classList.add('active');
+                filterBtns.forEach(btn => btn?.classList.remove('active'));
+                activeBtn?.classList.add('active');
             }
 
-            // Фильтрация чатов
             btnAll?.addEventListener('click', async () => {
                 await setActiveFilterBtn(btnAll);
                 // Логика отображения всех чатов
@@ -152,6 +287,42 @@
             });
 
             await setActiveFilterBtn(btnAll);
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const selectedContactId = urlParams.get('selected_contact_id');
+            if (selectedContactId) {
+                selectedContact = document.querySelector(`.contact-item[data-contact-id="${selectedContactId}"]`);
+                if (selectedContact) {
+                    selectedContact.classList.add('selected');
+                    await updateStatus(selectedContactId);
+                    chatAreaCon.style.display = 'none';
+                } else {
+                    chatArea.style.display = 'none';
+                }
+            }
+
+            const contactItems = document.querySelectorAll('.contact-item');
+            contactItems.forEach(contactItem => {
+                contactItem.addEventListener('click', async function () {
+                    contactItems.forEach(item => item.classList.remove('selected'));
+
+                    if (selectedContact === contactItem) return;
+
+                    selectedContact = contactItem;
+                    selectedContact.classList.add('selected');
+                    chatAreaCon.style.display = 'none';
+
+                    const contactId = contactItem.getAttribute('data-contact-id');
+                    if (contactId) {
+                        window.history.pushState({}, '', `/dash/?selected_contact_id=${contactId}`);
+                        await updateStatus(contactId);
+                    }
+                });
+            });
+
+            if (!selectedContact) {
+                chatArea.style.display = 'none';
+            }
         });
     </script>
 </body>

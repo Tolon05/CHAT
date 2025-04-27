@@ -14,7 +14,7 @@
     <div class="form-container">
         <h1 class="title">ChatsApp</h1>
 
-        <form action="/auth/login" method="post">
+        <form id="login-form">
             <!-- Поле для ввода имени пользователя -->
             <div class="input-group">
                 <i class="icon">
@@ -27,7 +27,7 @@
                             fill="#2BDB89" />
                     </svg>
                 </i>
-                <input type="text" name="username" placeholder="Username" required />
+                <input type="text" id="username" name="username" placeholder="Username" required />
             </div>
 
             <!-- Поле для ввода пароля -->
@@ -73,6 +73,78 @@
     </div>
 
     <script src="/static/app.js"></script>
+    <script>
+        // Добавляем обработку формы через JavaScript
+        document.getElementById('login-form').addEventListener('submit', async function (event) {
+            event.preventDefault();  // Предотвращаем стандартную отправку формы
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                // Используем FormData для отправки данных как 'application/x-www-form-urlencoded'
+                const formData = new FormData();
+                formData.append("username", username);
+                formData.append("password", password);
+
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const encryptedPrivateKey = data.encryptedPrivateKey;
+
+                    // Сохраняем ключ в IndexedDB
+                    await savePrivateKeyToIndexedDB(encryptedPrivateKey);
+                    alert('Login successful and private key saved!');
+                    window.location.href = '/dash/';  // Перенаправляем на дашборд
+                } else {
+                    const errorData = await response.json();
+                    alert(`Login failed: ${errorData.message}`);
+                }
+            } catch (error) {
+                console.error('Error during login process:', error);
+                alert('An error occurred during the login process.');
+            }
+        });
+
+        // Функция для сохранения данных в IndexedDB (асинхронная версия)
+        async function savePrivateKeyToIndexedDB(encryptedPrivateKey) {
+            const request = indexedDB.open("userKeysDB", 1);
+
+            return new Promise((resolve, reject) => {
+                request.onupgradeneeded = function (event) {
+                    const db = event.target.result;
+                    if (!db.objectStoreNames.contains("keys")) {
+                        db.createObjectStore("keys", { keyPath: "id", autoIncrement: true });
+                    }
+                };
+
+                request.onsuccess = function (event) {
+                    const db = event.target.result;
+                    const transaction = db.transaction("keys", "readwrite");
+                    const store = transaction.objectStore("keys");
+
+                    store.put({ id: 1, encryptedPrivateKey: encryptedPrivateKey });
+
+                    transaction.oncomplete = function () {
+                        console.log("Private key saved to IndexedDB");
+                        resolve();
+                    };
+
+                    transaction.onerror = function () {
+                        reject('Error saving private key to IndexedDB');
+                    };
+                };
+
+                request.onerror = function (event) {
+                    reject(`Error opening IndexedDB: ${event.target.error}`);
+                };
+            });
+        }
+    </script>
 </body>
 
 </html>

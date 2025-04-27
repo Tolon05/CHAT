@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, PrimaryKeyConstraint
+import uuid
+from sqlalchemy import UUID, Column, Integer, String, Boolean, DateTime, ForeignKey, PrimaryKeyConstraint, Text
 from sqlalchemy.orm import relationship
 from backend.database import Base
 from datetime import datetime, timezone
@@ -13,12 +14,11 @@ class User(Base):
     is_verified = Column(Boolean, default=False)
 
     devices = relationship("Device", back_populates="user", cascade="all, delete")
-
     my_contacts = relationship("Contact", foreign_keys="[Contact.owner_id]", back_populates="owner", cascade="all, delete")
-
     added_me = relationship("Contact", foreign_keys="[Contact.contact_id]", back_populates="contact")
-
     group_roles = relationship("GroupRole", back_populates="user")
+    user_keys = relationship("UserKey", back_populates="user", uselist=False)  
+    messages = relationship("Message", back_populates="sender")
 
 class Device(Base):
     __tablename__ = "devices"
@@ -63,7 +63,7 @@ class RoomParticipant(Base):
     room = relationship("ChatRoom", back_populates="participants")
 
     __table_args__ = (
-        PrimaryKeyConstraint('user_id', 'room_id'),  # Устанавливаем составной ключ
+        PrimaryKeyConstraint('user_id', 'room_id'),  
     )
 
 class GroupRole(Base):
@@ -71,13 +71,13 @@ class GroupRole(Base):
 
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     room_id = Column(Integer, ForeignKey("chat_rooms.id"), nullable=False)
-    role = Column(String)  # например: "admin", "moderator", "member"
+    role = Column(String)  
 
     user = relationship("User", back_populates="group_roles")
     room = relationship("ChatRoom", back_populates="group_roles")
 
     __table_args__ = (
-        PrimaryKeyConstraint('user_id', 'room_id'),  # Устанавливаем составной ключ
+        PrimaryKeyConstraint('user_id', 'room_id'), 
     )
 
 class GroupSettings(Base):
@@ -100,5 +100,24 @@ class Message(Base):
     content = Column(String)
     timestamp = Column(DateTime, default=datetime.now(timezone.utc), index=True)
 
-    sender = relationship("User")
+    sender = relationship("User", back_populates="messages")
     room = relationship("ChatRoom", back_populates="messages")
+    
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    room_id = Column(UUID(as_uuid=True), ForeignKey("rooms.id"))
+    sender_id = Column(UUID(as_uuid=True), ForeignKey("users.id"))
+    content_encrypted = Column(Text, nullable=False)
+    sent_at = Column(DateTime, default=datetime.now(timezone.utc))
+    read = Column(Boolean, default=False)
+
+class UserKey(Base):
+    __tablename__ = "user_keys"
+
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True, nullable=False) 
+    public_key = Column(String, nullable=False)  
+    encrypted_private_key = Column(String, nullable=False)  
+
+    user = relationship("User", back_populates="user_keys")

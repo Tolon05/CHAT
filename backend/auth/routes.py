@@ -3,10 +3,10 @@ import os
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from fastapi import APIRouter, Request, Form, Depends, HTTPException, Response
-from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates  # Импортируем Jinja2Templates
-from sqlalchemy.orm import Session
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.templating import Jinja2Templates 
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.database import get_db
@@ -16,6 +16,7 @@ from backend.celery_tasks.tasks import send_verification_email_task
 import random
 from backend.auth.token_utils import create_access_token, create_refresh_token, verify_refresh_token
 from backend.session_tokens import store_access_token, store_refresh_token, get_session, store_verification_code, verify_code
+from backend.auth.generation_keys import generate_and_store_keys
 from datetime import timedelta
 from backend.config import settings
 
@@ -110,26 +111,54 @@ async def verify(request: Request, code: str = Form(...), db: AsyncSession = Dep
     return RedirectResponse("/dash/", status_code=303)
 
 @router.post("/login")
-async def login(request: Request, username: str = Form(...), password: str = Form(...), db: AsyncSession = Depends(get_db)):
-    query = select(User).where(User.username == username)
+async def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...),
+    db: AsyncSession = Depends(get_db)
+):
+    # Запрос с явной загрузкой user_keys
+    query = select(User).where(User.username == username).options(selectinload(User.user_keys))
     result = await db.execute(query)
     user = result.scalars().first()
 
+    # Проверка учетных данных
     if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Неверные учетные данные")
 
+    # Генерация токенов
     access_token = await create_access_token({"user_id": user.id})
     refresh_token = await create_refresh_token({"user_id": user.id})
 
     expiration_time_refresh = timedelta(minutes=REFRESH_TOKEN_EXPIRE_MINUTES)
     expiration_time_access = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    response = RedirectResponse("/dash/", status_code=303)
-    
-    response.set_cookie(key="access_token", value=access_token, max_age=expiration_time_access, httponly=True, samesite="Strict") # secure=True,
-    response.set_cookie(key="refresh_token", value=refresh_token, max_age=expiration_time_refresh, httponly=True, samesite="Strict")
+    # Если ключи отсутствуют, генерируем их
+    if not user.user_keys:
+        await generate_and_store_keys(user, db)
+        # Обновляем объект user с новыми ключами
+        await db.refresh(user)
 
-    await store_access_token(user.id, access_token, expiration_time_access)
-    await store_refresh_token(user.id, refresh_token, expiration_time_refresh)
+    # Формируем ответ
+    response = JSONResponse(content={
+        "message": "Login successful",
+        "encryptedPrivateKey": user.user_keys.encrypted_private_key if user.user_keys else None
+    })
+
+    # Установка куки
+    response.set_cookie(
+        "access_token",
+        access_token,
+        max_age=int(expiration_time_access.total_seconds()),
+        httponly=True,
+        samesite="Strict"
+    )
+    response.set_cookie(
+        "refresh_token",
+        refresh_token,
+        max_age=int(expiration_time_refresh.total_seconds()),
+        httponly=True,
+        samesite="Strict"
+    )
 
     return response
