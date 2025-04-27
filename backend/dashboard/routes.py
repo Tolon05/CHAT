@@ -17,6 +17,8 @@ from sqlalchemy.sql import exists
 from pathlib import Path
 import shutil
 import base64
+import uuid
+from base64 import b64encode
 
 router_dash = APIRouter()
 
@@ -89,7 +91,7 @@ async def dashboard(
             "request": request,
             "contacts": chats_with_contacts,
             "selected_contact": selected_contact,
-            "selected_contact_user": selected_contact[1],
+            "selected_contact_user": selected_contact[1] if selected_contact else None,
             "contact_data_dict": contact_data_dict, 
         }, 
         response=response
@@ -214,3 +216,150 @@ async def update_profile(
         await db.rollback()
         print(f"Error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+@router_dash.get("/status", response_class=HTMLResponse)
+async def statuses_page(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    # Получить пользователя
+    result = await db.execute(select(User).where(User.id == current_user_id))
+    user = result.scalar_one_or_none()
+    
+    my_status = None
+    avatar_url = None
+    if user:
+        # Если есть статус, используем его
+        if user.status:
+            my_status = "/static/statuses/" + user.status
+        # Если нет статуса, проверяем аватар
+        if not my_status:
+            if user.avatar_data:
+                # Преобразуем бинарные данные аватарки в base64
+                avatar_url = f"data:image/png;base64,{b64encode(user.avatar_data).decode('utf-8')}"
+            else:
+                # Если нет аватарки, используем дефолтную
+                avatar_url = "/static/avatars/default_avatar.png"
+
+    # Получить контактов
+    contacts_query = await db.execute(
+        select(Contact.contact_id)
+        .where(Contact.owner_id == current_user_id)
+    )
+    contact_ids = [row[0] for row in contacts_query.all()]
+    
+    users_query = await db.execute(
+        select(User.id, User.username, User.status)
+        .where(User.id.in_(contact_ids))
+        .where(User.status.isnot(None))
+    )
+    
+    contacts_statuses = users_query.all()
+    
+    contacts_statuses_list = [
+        {"id": row.id, "username": row.username, "status": "/static/statuses/" + row.status if row.status else None}
+        for row in contacts_statuses
+    ]
+    
+    return templates.TemplateResponse(
+        "status.html",
+        {
+            "request": request,
+            "view_mode": "list",
+            "my_status": my_status,
+            "avatar_url": avatar_url,
+            "contacts_statuses": contacts_statuses_list,
+            "selected_contact": None
+        }
+    )
+
+
+
+@router_dash.get("/contact_status/{contact_id}", response_class=HTMLResponse)
+async def contact_status(
+    contact_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    # Проверка, что контакт принадлежит текущему пользователю
+    result = await db.execute(
+        select(Contact)
+        .where(Contact.owner_id == current_user_id, Contact.contact_id == contact_id)
+    )
+    contact = result.scalar_one_or_none()
+    if not contact:
+        raise HTTPException(status_code=403, detail="Not a contact")
+
+    # Получить данные пользователя (контакта)
+    result = await db.execute(
+        select(User.username, User.status)
+        .where(User.id == contact_id)
+    )
+    user = result.first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    status_url = "/static/statuses/" + user.status if user.status else None
+    return templates.TemplateResponse(
+        "status.html",
+        {
+            "request": request,
+            "view_mode": "contact",  # Режим отображения: статус контакта
+            "my_status": None,
+            "contacts_statuses": [],
+            "selected_contact": {"username": user.username, "status": status_url}
+        }
+    )
+
+
+@router_dash.post("/upload_status")
+async def upload_status(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    status_dir = os.path.join(BASE_DIR, "frontend", "static", "statuses")
+    os.makedirs(status_dir, exist_ok=True)
+
+    file_extension = file.filename.split(".")[-1]
+    status_filename = f"{current_user_id}_{uuid.uuid4()}.{file_extension}"
+    file_path = os.path.join(status_dir, status_filename)
+
+    with open(file_path, "wb") as f:
+        content = await file.read()
+        f.write(content)
+
+    result = await db.execute(select(User).where(User.id == current_user_id))
+    user = result.scalar_one_or_none()
+    if user:
+        user.status = status_filename
+        await db.commit()
+
+    return RedirectResponse(url="/dash/status", status_code=303)
+
+@router_dash.post("/delete_status")
+async def delete_status(
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    # Получить пользователя
+    result = await db.execute(select(User).where(User.id == current_user_id))
+    user = result.scalar_one_or_none()
+
+    if user and user.status:
+        # Путь к файлу статуса
+        status_path = os.path.join(BASE_DIR, "frontend", "static", "statuses", user.status)
+
+        # Удаление файла, если он существует
+        if os.path.exists(status_path):
+            os.remove(status_path)
+
+        # Очистка поля статуса у пользователя
+        user.status = None
+        await db.commit()
+
+    return RedirectResponse(url="/dash/status", status_code=303)
