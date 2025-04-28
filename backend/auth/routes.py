@@ -143,7 +143,7 @@ async def login(
     # Формируем ответ
     response = JSONResponse(content={
         "message": "Login successful",
-        "access_token": access_token, 
+        "access_token": refresh_token, 
         "encryptedPrivateKey": user.user_keys.encrypted_private_key if user.user_keys else None
     })
 

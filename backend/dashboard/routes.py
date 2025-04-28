@@ -49,69 +49,48 @@ async def dashboard(
     selected_contact = None
     contact_data_dict = {}
 
-    # Обработка выбранного контакта
     if selected_contact_id:
-        # Создаем псевдоним для таблицы RoomParticipant
+        # Создаем псевдонимы для таблицы RoomParticipant
+        rp1 = aliased(RoomParticipant, name='rp1')
         rp2 = aliased(RoomParticipant, name='rp2')
 
-        # Подзапрос для получения ID приватной комнаты
+        # Запрос для получения ID приватной комнаты
         subquery = (
             select(ChatRoom.id)
-            .join(RoomParticipant, RoomParticipant.room_id == ChatRoom.id)
+            .join(rp1, rp1.room_id == ChatRoom.id)
+            .join(rp2, rp2.room_id == ChatRoom.id)
             .where(
                 and_(
                     ChatRoom.type == "private",
-                    RoomParticipant.user_id == current_user_id
+                    rp1.user_id == current_user_id,
+                    rp2.user_id == selected_contact_id
                 )
             )
-            .join(
-                rp2, 
-                and_(
-                    rp2.room_id == ChatRoom.id,
-                    rp2.user_id == Contact.contact_id
-                )
-            )
-            .where(Contact.id == selected_contact_id, Contact.owner_id == current_user_id)
-            .correlate(Contact)
             .scalar_subquery()  # Преобразуем в скалярный подзапрос
         )
 
-        # Основной запрос для получения контакта, пользователя и комнаты
+        # Оборачиваем подзапрос в select для выполнения
+        executable_query = select(subquery)
+
+        # Выполним запрос для получения ID комнаты
+        room_id_result = await db.execute(executable_query)
+        room_id = room_id_result.scalar()  # Получаем первый (и единственный) результат подзапроса
+
+        if room_id is None:
+            print(f"Приватная комната не найдена для текущего пользователя {current_user_id} и контакта с ID {selected_contact_id}")
+
+    if selected_contact_id and room_id:
+    # Запрос для получения контакта, пользователя и комнаты
         selected_contact_result = await db.execute(
             select(Contact, User, ChatRoom)
             .join(User, User.id == Contact.contact_id)
-            .outerjoin(
-                ChatRoom, 
-                and_(
-                    ChatRoom.id == subquery,  # Используем скалярный подзапрос
-                    ChatRoom.type == "private"
-                )
-            )
-            .where(Contact.id == selected_contact_id, Contact.owner_id == current_user_id)
+            .outerjoin(ChatRoom, ChatRoom.id == room_id)  # Используем полученный room_id
+            .where(Contact.contact_id == selected_contact_id, Contact.owner_id == current_user_id)
         )
-        selected_contact = selected_contact_result.first()  # (Contact, User, ChatRoom)
 
-        # Если контакт не найден
-        if selected_contact_id and not selected_contact:
-            raise HTTPException(status_code=404, detail="Contact not found")
-
-        # Если комната не найдена, создаем новую приватную комнату
-        if selected_contact and not selected_contact[2]:  # ChatRoom отсутствует
-            contact_obj, user_obj, _ = selected_contact
-            # Создаем новую комнату
-            new_room = ChatRoom(type="private")
-            db.add(new_room)
-            await db.commit()
-            await db.refresh(new_room)
-
-            # Добавляем участников (текущий пользователь и контакт)
-            participant1 = RoomParticipant(room_id=new_room.id, user_id=current_user_id)
-            participant2 = RoomParticipant(room_id=new_room.id, user_id=user_obj.id)
-            db.add_all([participant1, participant2])
-            await db.commit()
-
-            # Обновляем selected_contact с новой комнатой
-            selected_contact = (contact_obj, user_obj, new_room)
+        selected_contact = selected_contact_result.first()  # Получаем первый результат (Contact, User, ChatRoom)
+        if selected_contact is None:
+            print(f"Contact ID {selected_contact_id} not found for user {current_user_id}")
 
     # Запрос для получения всех чатов и контактов
     result = await db.execute(
@@ -217,7 +196,7 @@ async def add_contact(
     room = ChatRoom(name=f"Chat with {target_user.username}", type="private")
     session.add(room)
     await session.commit()  # Сохраняем комнату
-    await session.refresh(room)  # Обновляем объект room для получения id
+    await session.refresh(room)  
 
     # Добавляем участников комнаты
     # Используем target_user.id напрямую, но сначала убеждаемся, что объект не expired
@@ -226,7 +205,7 @@ async def add_contact(
     room_participant_2 = RoomParticipant(user_id=target_user.id, room_id=room.id)
     session.add(room_participant_1)
     session.add(room_participant_2)
-    await session.commit()  # Сохраняем участников
+    await session.commit()  
 
     return RedirectResponse(url="/dash/new_con", status_code=303)
 

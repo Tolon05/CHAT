@@ -7,18 +7,95 @@
     <title>ChatsApp</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/dashboard.css">
+    <style>
+        .message-list {
+            padding: 10px;
+            overflow-y: auto;
+            flex-grow: 1;
+        }
+
+        .message {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            max-width: 70%;
+        }
+
+        .message.received {
+            justify-content: flex-start;
+        }
+
+        .message.sent {
+            justify-content: flex-end;
+            margin-left: auto;
+        }
+
+        .message .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .message.received .avatar {
+            margin-right: 10px;
+        }
+
+        .message.sent .avatar {
+            margin-left: 10px;
+            order: 2;
+        }
+
+        .message-content {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message.received .message-content {
+            background-color: #2a3e4c;
+            color: white;
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+
+        .message.sent .message-content {
+            background-color: #3e5c76;
+            color: white;
+            border-radius: 10px;
+            padding: 8px 12px;
+        }
+
+        .message-sender {
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .message-text {
+            font-size: 14px;
+            word-wrap: break-word;
+        }
+
+        .message-time {
+            font-size: 12px;
+            color: #b0b0b0;
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        .error {
+            color: red;
+            text-align: center;
+        }
+    </style>
 </head>
 
 <body>
-
-    <!-- Main Container -->
     <div class="app-container">
-        <!-- Sidebar -->
         <div class="sidebar">
-            <!-- Search -->
             <div class="search-container">
                 <div class="search-bar">
-                    <!-- Иконка поиска -->
                     <i>
                         <svg width="20" height="20" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
                             <path fill-rule="evenodd" clip-rule="evenodd"
@@ -26,10 +103,8 @@
                                 fill="white" />
                         </svg>
                     </i>
-                    <!-- Инпут для поиска -->
                     <input type="search" placeholder="Search" id="search-input">
                 </div>
-                <!-- Иконка с тремя точками -->
                 <div class="search-menu-icon">
                     <i>
                         <svg width="40" height="40" viewBox="0 0 50 60" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -41,7 +116,6 @@
                 </div>
             </div>
 
-            <!-- Filter Buttons under Search -->
             <div class="filter-buttons">
                 <button class="filter-btn active" id="btn-all">Все</button>
                 <button class="filter-btn" id="btn-unread">Непрочитанные</button>
@@ -53,23 +127,24 @@
                 {% for contact in contacts %}
                 {% set room, user = contact %}
                 {% set contact_obj = contact_data_dict.get(user.id) if user else None %}
-                <div class="contact-item {% if selected_contact and contact_obj and selected_contact[0].id == contact_obj.id %}selected{% endif %}"
-                    data-contact-id="{{ contact_obj.id if contact_obj else '' }}"
-                    data-room-id="{{ room.id if room else '' }}">
+                <div class="contact-item {% if selected_contact and user and selected_contact[0].id == user.id %}selected{% endif %}"
+                    data-contact-id="{{ user.id if user else '' }}" data-room-id="{{ room.id if room else '' }}"
+                    data-username="{{ user.username if user else 'No user' }}"
+                    data-avatar="{% if contact_obj and contact_obj.avatar_data %}data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}{% else %}default{% endif %}">
                     <div class="contact-avatar">
                         {% if contact_obj and contact_obj.avatar_data %}
-                        <img src="data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}" alt="avatar" class="contact-avatar-img" width="50" height="50">
+                        <img src="data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}" alt="avatar"
+                            class="contact-avatar-img" width="50" height="50">
                         {% else %}
-                        <!-- Иконка по умолчанию -->
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"
-                            class="contact-avatar-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"
+                            fill="currentColor" class="contact-avatar-icon">
                             <path
                                 d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                         </svg>
                         {% endif %}
                     </div>
                     <div class="contact-info">
-                        <div class="contact-name">{{ contact_obj.username if user else 'No user' }}</div>
+                        <div class="contact-name">{{ user.username if user else 'No user' }}</div>
                         <div class="contact-last-msg">—</div>
                     </div>
                 </div>
@@ -82,37 +157,27 @@
             <div class="nav-icons">
                 <div class="nav-item" id="nav-chats">
                     <div class="nav-circle">
-                        <a href="/dash/">
-                            <i class="fas fa-comment-alt"></i>
-                        </a>
+                        <a href="/dash/"><i class="fas fa-comment-alt"></i></a>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-status">
                     <div class="nav-circle">
-                        <a href="/dash/status">
-                            <i class="fas fa-video"></i>
-                        </a>
+                        <a href="/dash/status"><i class="fas fa-video"></i></a>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-favorites">
                     <div class="nav-circle">
-                        <a href="/favorites">
-                            <i class="fas fa-star"></i>
-                        </a>
+                        <a href="/favorites"><i class="fas fa-star"></i></a>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-new">
                     <div class="nav-circle">
-                        <a href="/dash/add_con">
-                            <i class="fas fa-user-plus"></i>
-                        </a>
+                        <a href="/dash/add_con"><i class="fas fa-user-plus"></i></a>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-profile">
                     <div class="nav-circle">
-                        <a href="/dash/profile">
-                            <i class="fas fa-user"></i>
-                        </a>
+                        <a href="/dash/profile"><i class="fas fa-user"></i></a>
                     </div>
                 </div>
             </div>
@@ -120,41 +185,35 @@
 
         <div class="chat-area-con" id="chat-area-con"></div>
 
-        <!-- Chat Area -->
         <div class="chat-area" id="chat-area">
             <div class="chat-header">
                 <div class="chat-back" id="chat-back">
                     <i class="fas fa-arrow-left"></i>
                 </div>
-            
-                <!-- Добавлен блок с аватаром, именем и статусом -->
                 <div class="chat-info" style="display: flex; align-items: center; gap: 10px;">
                     <div class="contact-avatar" style="margin-left: 20px;">
                         {% if selected_contact_user and selected_contact_user.avatar_data %}
-                        <img src="data:image/png;base64,{{ selected_contact_user.avatar_data | b64encode }}" alt="avatar" class="contact-avatar-img"
-                            width="50" height="50">
+                        <img src="data:image/png;base64,{{ selected_contact_user.avatar_data | b64encode }}"
+                            alt="avatar" class="contact-avatar-img" width="50" height="50">
                         {% else %}
-                        <!-- Иконка по умолчанию -->
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"
-                            class="contact-avatar-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"
+                            fill="currentColor" class="contact-avatar-icon">
                             <path
                                 d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                         </svg>
                         {% endif %}
                     </div>
-
-                    <!-- Имя и статус -->
                     <div style="display: flex; flex-direction: column;">
-                        <div class="chat-title" id="current-chat-title" style="font-weight: bold; color: white;">{% if selected_contact %}
-                        {{ selected_contact[1].username }}
-                        {% else %}
-                        Выберите контакт
-                        {% endif %}
+                        <div class="chat-title" id="current-chat-title" style="font-weight: bold; color: white;">
+                            {% if selected_contact %}
+                            {{ selected_contact[1].username }}
+                            {% else %}
+                            Выберите контакт
+                            {% endif %}
                         </div>
                         <div id="chat-status" style="font-size: 12px; color: lightgray;"></div>
                     </div>
                 </div>
-            
                 <div class="chat-actions">
                     <i style="margin-top: 8px;">
                         <svg width="25" height="25" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -174,7 +233,6 @@
             </div>
 
             <div class="message-list" id="message-list">
-                <!-- Messages will be loaded here -->
                 <div class="loading">Select a chat to view messages</div>
             </div>
 
@@ -196,6 +254,7 @@
         const input = document.getElementById("message-input");
         const micIcon = document.getElementById("mic-icon");
         const sendIcon = document.getElementById("send-icon");
+        const userId = "{{ request.state.user_id }}";
 
         document.getElementById('send-icon').addEventListener('click', function () {
             const messageInput = document.getElementById('message-input');
@@ -219,7 +278,6 @@
                 return;
             }
 
-            // Получение токена из cookies или IndexedDB
             getToken().then(token => {
                 sendMessage(roomId, message, token);
             }).catch(error => {
@@ -227,7 +285,6 @@
             });
         });
 
-        // Функция для получения токена из cookies
         function getCookie(name) {
             const value = `; ${document.cookie}`;
             const parts = value.split(`; ${name}=`);
@@ -236,7 +293,6 @@
             }
         }
 
-        // Функция для получения токена из IndexedDB
         function getTokenFromIndexedDB() {
             const request = indexedDB.open('userKeysDB', 2);
 
@@ -273,16 +329,17 @@
             });
         }
 
-        // Функция для получения токена (из cookies или IndexedDB)
         function getToken() {
             return new Promise((resolve, reject) => {
                 let token = getCookie('access_token');
+                console.log("Токен из cookies:", token);
 
-                if (token && isValidToken(token)) {
+                if (token) {
                     resolve(token);
                 } else {
                     getTokenFromIndexedDB().then(fetchedToken => {
-                        if (isValidToken(fetchedToken)) {
+                        console.log("Токен из IndexedDB:", fetchedToken);
+                        if (fetchedToken) {
                             resolve(fetchedToken);
                         } else {
                             reject('Токен не действителен');
@@ -294,25 +351,6 @@
             });
         }
 
-        // Проверка валидности токена
-        function isValidToken(token) {
-            if (!token) return false;
-
-            const parts = token.split('.');
-            if (parts.length !== 3) return false;
-
-            try {
-                const payload = JSON.parse(atob(parts[1]));
-                const expirationTime = payload.exp;
-                const currentTime = Math.floor(Date.now() / 1000);
-                return expirationTime > currentTime;
-            } catch (error) {
-                console.error("Ошибка валидации токена:", error);
-                return false;
-            }
-        }
-
-        // Функция отправки сообщения через WebSocket
         function sendMessage(roomId, message, token) {
             const socket = new WebSocket(`ws://localhost:8000/ws/send_message/${roomId}`);
 
@@ -322,7 +360,7 @@
                     token: token
                 };
                 socket.send(JSON.stringify(payload));
-                document.getElementById('message-input').value = ''; // Очистить поле ввода
+                document.getElementById('message-input').value = '';
             };
 
             socket.onmessage = function (event) {
@@ -357,7 +395,6 @@
         micIcon.classList.add("active");
 
         const onlineUsers = new Set();
-        const userId = "{{ request.state.user_id }}";
 
         let ws;
         if (userId) {
@@ -422,6 +459,9 @@
 
             const chatAreaCon = document.getElementById('chat-area-con');
             const chatArea = document.getElementById('chat-area');
+            const chatTitle = document.getElementById('current-chat-title');
+            const chatStatus = document.getElementById('chat-status');
+            const messageList = document.getElementById('message-list');
 
             async function setActiveFilterBtn(activeBtn) {
                 const filterBtns = [btnAll, btnUnread, btnGroups];
@@ -431,20 +471,106 @@
 
             btnAll?.addEventListener('click', async () => {
                 await setActiveFilterBtn(btnAll);
-                // Логика отображения всех чатов
             });
 
             btnUnread?.addEventListener('click', async () => {
                 await setActiveFilterBtn(btnUnread);
-                // Логика отображения только непрочитанных
             });
 
             btnGroups?.addEventListener('click', async () => {
                 await setActiveFilterBtn(btnGroups);
-                // Логика отображения только групп
             });
 
             await setActiveFilterBtn(btnAll);
+
+            let currentRoomId = null;
+            let chatSocket = null;
+
+            function createMessageElement(msg, isSent) {
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message');
+                messageDiv.classList.add(isSent ? 'sent' : 'received');
+
+                const avatarImg = document.createElement('img');
+                avatarImg.classList.add('avatar');
+                const contactItem = document.querySelector(`.contact-item[data-contact-id="${msg.sender_id}"]`);
+                if (contactItem) {
+                    const avatarSrc = contactItem.getAttribute('data-avatar');
+                    avatarImg.src = avatarSrc !== 'default' ? avatarSrc : 'https://via.placeholder.com/40';
+                } else {
+                    avatarImg.src = 'https://via.placeholder.com/40';
+                }
+                messageDiv.appendChild(avatarImg);
+
+                const contentDiv = document.createElement('div');
+                contentDiv.classList.add('message-content');
+
+                const senderDiv = document.createElement('div');
+                senderDiv.classList.add('message-sender');
+                senderDiv.textContent = contactItem ? contactItem.getAttribute('data-username') : msg.sender_id;
+                contentDiv.appendChild(senderDiv);
+
+                const textDiv = document.createElement('div');
+                textDiv.classList.add('message-text');
+                textDiv.textContent = msg.content || msg.message;
+                contentDiv.appendChild(textDiv);
+
+                const timeDiv = document.createElement('div');
+                timeDiv.classList.add('message-time');
+                timeDiv.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                contentDiv.appendChild(timeDiv);
+
+                messageDiv.appendChild(contentDiv);
+
+                return messageDiv;
+            }
+
+            async function loadMessages(roomId) {
+                if (chatSocket) {
+                    chatSocket.close();
+                }
+
+                chatSocket = new WebSocket(`ws://localhost:8000/ws/chat/${roomId}`);
+
+                chatSocket.onopen = function () {
+                    console.log("WebSocket для чата открыт:", roomId);
+                    getToken().then(token => {
+                        chatSocket.send(JSON.stringify({ token: token }));
+                    }).catch(error => {
+                        console.error("Ошибка получения токена:", error);
+                        messageList.innerHTML = '<div class="error">Ошибка аутентификации</div>';
+                    });
+                };
+
+                chatSocket.onmessage = function (event) {
+                    const data = JSON.parse(event.data);
+                    if (data.event === "message_history") {
+                        messageList.innerHTML = '';
+                        data.messages.forEach(msg => {
+                            const isSent = String(msg.sender_id) === String(userId);
+                            const messageElement = createMessageElement(msg, isSent);
+                            messageList.appendChild(messageElement);
+                        });
+                        messageList.scrollTop = messageList.scrollHeight;
+                    } else if (data.event === "new_message") {
+                        const isSent = String(data.sender_id) === String(userId);
+                        const messageElement = createMessageElement(data, isSent);
+                        messageList.appendChild(messageElement);
+                        messageList.scrollTop = messageList.scrollHeight;
+                    } else if (data.event === "error") {
+                        messageList.innerHTML = `<div class="error">${data.message}</div>`;
+                    }
+                };
+
+                chatSocket.onclose = function () {
+                    console.log("WebSocket для чата закрыт");
+                };
+
+                chatSocket.onerror = function (error) {
+                    console.error("Ошибка WebSocket для чата:", error);
+                    messageList.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+                };
+            }
 
             const urlParams = new URLSearchParams(window.location.search);
             const selectedContactId = urlParams.get('selected_contact_id');
@@ -454,6 +580,15 @@
                     selectedContact.classList.add('selected');
                     await updateStatus(selectedContactId);
                     chatAreaCon.style.display = 'none';
+                    // chatArea.style.display = 'block';
+
+                    const contactName = selectedContact.querySelector('.contact-name').textContent;
+                    chatTitle.textContent = contactName;
+
+                    currentRoomId = selectedContact.getAttribute('data-room-id');
+                    if (currentRoomId) {
+                        await loadMessages(currentRoomId);
+                    }
                 } else {
                     chatArea.style.display = 'none';
                 }
@@ -469,11 +604,21 @@
                     selectedContact = contactItem;
                     selectedContact.classList.add('selected');
                     chatAreaCon.style.display = 'none';
+                    // chatArea.style.display = 'block';
+
+                    const contactName = contactItem.querySelector('.contact-name').textContent;
+                    chatTitle.textContent = contactName;
 
                     const contactId = contactItem.getAttribute('data-contact-id');
                     if (contactId) {
-                        window.history.pushState({}, '', `/dash/?selected_contact_id=${contactId}`);
+                        const chatUrl = `/dash/?selected_contact_id=${contactId}`;
+                        window.location.href = chatUrl;
                         await updateStatus(contactId);
+
+                        currentRoomId = contactItem.getAttribute('data-room-id');
+                        if (currentRoomId) {
+                            await loadMessages(currentRoomId);
+                        }
                     }
                 });
             });
