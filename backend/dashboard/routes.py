@@ -49,12 +49,11 @@ async def dashboard(
     selected_contact = None
     contact_data_dict = {}
 
+    # Получение приватной комнаты для selected_contact_id
     if selected_contact_id:
-        # Создаем псевдонимы для таблицы RoomParticipant
         rp1 = aliased(RoomParticipant, name='rp1')
         rp2 = aliased(RoomParticipant, name='rp2')
 
-        # Запрос для получения ID приватной комнаты
         subquery = (
             select(ChatRoom.id)
             .join(rp1, rp1.room_id == ChatRoom.id)
@@ -66,48 +65,51 @@ async def dashboard(
                     rp2.user_id == selected_contact_id
                 )
             )
-            .scalar_subquery()  # Преобразуем в скалярный подзапрос
+            .scalar_subquery()
         )
 
-        # Оборачиваем подзапрос в select для выполнения
         executable_query = select(subquery)
-
-        # Выполним запрос для получения ID комнаты
         room_id_result = await db.execute(executable_query)
-        room_id = room_id_result.scalar()  # Получаем первый (и единственный) результат подзапроса
+        room_id = room_id_result.scalar()
 
         if room_id is None:
-            print(f"Приватная комната не найдена для текущего пользователя {current_user_id} и контакта с ID {selected_contact_id}")
+            print(f"Приватная комната не найдена для пользователя {current_user_id} и контакта {selected_contact_id}")
 
-    if selected_contact_id and room_id:
-    # Запрос для получения контакта, пользователя и комнаты
-        selected_contact_result = await db.execute(
-            select(Contact, User, ChatRoom)
-            .join(User, User.id == Contact.contact_id)
-            .outerjoin(ChatRoom, ChatRoom.id == room_id)  # Используем полученный room_id
-            .where(Contact.contact_id == selected_contact_id, Contact.owner_id == current_user_id)
-        )
+        # Запрос для выбранного контакта
+        if room_id:
+            selected_contact_result = await db.execute(
+                select(Contact, User, ChatRoom)
+                .select_from(User)  # Явно указываем начальную таблицу
+                .outerjoin(
+                    Contact,
+                    and_(Contact.contact_id == User.id, Contact.owner_id == current_user_id)
+                )
+                .outerjoin(
+                    ChatRoom,
+                    ChatRoom.id == room_id
+                )
+                .where(User.id == selected_contact_id)
+            )
+            selected_contact = selected_contact_result.first()
+            if selected_contact is None:
+                print(f"Контакт или пользователь {selected_contact_id} не найден для пользователя {current_user_id}")
 
-        selected_contact = selected_contact_result.first()  # Получаем первый результат (Contact, User, ChatRoom)
-        if selected_contact is None:
-            print(f"Contact ID {selected_contact_id} not found for user {current_user_id}")
-
-    # Запрос для получения всех чатов и контактов
+    # Запрос для получения всех чатов и участников
     result = await db.execute(
         select(ChatRoom, User)
         .select_from(ChatRoom)
-        .outerjoin(RoomParticipant, RoomParticipant.room_id == ChatRoom.id)
+        .join(RoomParticipant, RoomParticipant.room_id == ChatRoom.id)
+        .join(User, User.id == RoomParticipant.user_id)
         .outerjoin(Message, Message.room_id == ChatRoom.id)
-        .outerjoin(Contact, and_(Contact.owner_id == current_user_id))
-        .outerjoin(User, User.id == Contact.contact_id)
         .where(
-            or_(
-                and_(
-                    RoomParticipant.user_id == current_user_id,
-                    message_exists
+            and_(
+                RoomParticipant.user_id != current_user_id,  # Исключаем текущего пользователя
+                ChatRoom.id.in_(
+                    select(RoomParticipant.room_id)
+                    .where(RoomParticipant.user_id == current_user_id)
                 ),
-                and_(
-                    RoomParticipant.user_id == current_user_id,
+                or_(
+                    message_exists,
                     ChatRoom.type != "private"
                 )
             )
@@ -117,13 +119,26 @@ async def dashboard(
 
     chats_with_contacts = result.all()
 
+    # Заполняем contact_data_dict для пользователей, которые есть в контактах
+    contact_result = await db.execute(
+        select(User, Contact)
+        .join(Contact, Contact.contact_id == User.id)
+        .where(Contact.owner_id == current_user_id)
+    )
+    for user, contact in contact_result.all():
+        contact_data_dict[user.id] = user
+
     # Обработка данных для шаблона
     if selected_contact:
         contact_obj, user_obj, room_obj = selected_contact
         user_ids = {user.id for room, user in chats_with_contacts if user}
-        if user_obj.id not in user_ids:
+        if user_obj and user_obj.id not in user_ids:
             chats_with_contacts.insert(0, (room_obj, user_obj))
-        contact_data_dict[user_obj.id] = user_obj
+        if user_obj:
+            contact_data_dict[user_obj.id] = user_obj
+
+    for room, user in chats_with_contacts:
+        print(f"Room: {room.id}, User: {user.username if user else 'None'}")
 
     return templates.TemplateResponse(
         "dashboard.html",
@@ -147,6 +162,16 @@ async def add_con_page(request: Request, db: AsyncSession = Depends(get_db), cur
     )
     contacts = result.scalars().all()
     return templates.TemplateResponse("add_contacts.html", {"request": request, "contacts": contacts})
+
+@router_dash.get("/new_group", response_class=HTMLResponse)
+async def add_con_page(request: Request, db: AsyncSession = Depends(get_db), current_user_id: int = Depends(verify_access_token_for_user_id)):
+    result = await db.execute(
+        select(User)
+        .join(Contact, Contact.contact_id == User.id)
+        .where(Contact.owner_id == current_user_id)
+    )
+    contacts = result.scalars().all()
+    return templates.TemplateResponse("new_group.html", {"request": request, "contacts": contacts})
 
 @router_dash.get("/new_con", response_class=HTMLResponse)
 async def new_con_page(request: Request, db: AsyncSession = Depends(get_db)):

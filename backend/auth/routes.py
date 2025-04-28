@@ -89,11 +89,11 @@ async def verify_form(request: Request):
     return templates.TemplateResponse("verify.html", {"request": request})
 
 @router.post("/verify")
-async def verify(request: Request, code: str = Form(...), db: AsyncSession = Depends(get_db)):
+async def verify(request: Request, username: str = Form(...), db: AsyncSession = Depends(get_db)):
     email = request.session.get("email")
 
-    if not await verify_code(email, code): 
-        print("❌ Неверный код:", code)
+    if not await verify_code(email, username): 
+        print("❌ Неверный код:", username)
         raise HTTPException(status_code=400, detail="Код недействителен или просрочен")
 
     user = User(

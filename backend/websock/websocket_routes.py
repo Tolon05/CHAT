@@ -179,10 +179,13 @@ async def send_message_to_room(
             db_session.add(read_status)
             await db_session.commit()
 
+            # Получаем список участников комнаты
             result = await db_session.execute(
                 select(RoomParticipant.user_id).filter_by(room_id=room_id)
             )
-            participant_ids = [row[0] for row in result.scalars().all()]
+            participant_ids = result.scalars().all()
+            # Создаем новый список, исключая отправителя
+            other_participant_ids = [uid for uid in participant_ids if uid != sender_id]
 
             message_data = {
                 "event": "new_message",
@@ -194,7 +197,8 @@ async def send_message_to_room(
                 "read_by": [sender_id]
             }
 
-            for user_id in participant_ids:
+            # Отправляем сообщение всем участникам комнаты (кроме отправителя)
+            for user_id in other_participant_ids:
                 ws = connected_users.get(user_id)
                 if ws:
                     try:
@@ -205,10 +209,12 @@ async def send_message_to_room(
                 else:
                     print(f"User {user_id} is not connected to WebSocket")
 
+            # Подтверждаем отправителю, что сообщение отправлено
             await websocket.send_json({
                 "event": "message_sent",
                 "status": "success",
-                "message": message
+                "message": message,
+                "message_id": message_id
             })
 
     except WebSocketDisconnect:

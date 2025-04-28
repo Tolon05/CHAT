@@ -1,0 +1,227 @@
+:root {
+    --primary-color: #2BDB89;
+    --secondary-color: #f0f2f5;
+    --chat-bg-color: #e5ddd5;
+    --text-color: #111b21;
+    --light-text: #FFFFFF;
+    --border-color: #FFFFFF;
+    --outgoing-bg: #d9fdd3;
+    --incoming-bg: #ffffff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Helvetica Neue, Helvetica, Arial, sans-serif;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    max-width: 1600px;
+    margin: 0 auto;
+    background-color: #45776C;
+}
+
+.sidebar {
+    width: 30%;
+    min-width: 300px;
+    max-width: 400px;
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+}
+
+.back-container {
+    padding: 10px 20px;
+    background-color: #386158;
+    display: flex;
+    align-items: center;
+}
+
+.back-arrow {
+    color: var(--light-text);
+    font-size: 20px;
+    text-decoration: none;
+}
+
+.search-container {
+    padding: 0 20px 10px;
+    background-color: #386158;
+    display: flex;
+    align-items: center;
+}
+
+.search-bar {
+    display: flex;
+    align-items: center;
+    background-color: #303F3B;
+    border-radius: 15px;
+    padding: 6px 20px;
+    border: 2px solid #FFFFFF;
+    width: 100%;
+}
+
+.search-bar i {
+    color: var(--light-text);
+    margin-right: 8px;
+}
+
+.search-bar input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 6px 8px;
+    font-size: 20px;
+    background-color: transparent;
+    color: var(--light-text);
+}
+
+.contact-list {
+    overflow-y: auto;
+    flex: 1;
+    padding: 10px 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.contact-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 14px;
+    background-color: transparent;
+    color: white;
+    border: 2px solid transparent;
+    border-radius: 10px;
+    text-decoration: none;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease, border-color 0.3s ease;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.contact-item:hover {
+    background-color: #235347;
+}
+
+.contact-avatar {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 50px;
+    height: 50px;
+    background-color: white;
+    border-radius: 50%;
+    margin-right: 20px;
+    font-size: 20px;
+    color: #1f1f1f;
+}
+
+.contact-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.contact-name {
+    font-size: 20px;
+    color: white;
+}
+
+.contact-last-msg {
+    font-size: 12px;
+    color: #ccc;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Checkmark Styling - Positioned in Bottom-Right of Avatar */
+.checkmark-container {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+}
+
+.checkmark {
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: 2px solid white;
+}
+
+.checkmark i {
+    color: white;
+    font-size: 12px;
+}
+
+/* Next Button Styling */
+.next-button {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--primary-color);
+    border: none;
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.next-button:hover {
+    transform: scale(1.1);
+}
+
+.next-button i {
+    color: white;
+    font-size: 20px;
+}
+
+.chat-area-con {
+    background-image: url('/static/resourses/background.png');
+    background-position: right center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    flex: 1;
+}
+
+.chat-area-con::before {
+    content: "CHATSAPP";
+    position: absolute;
+    top: 45%;
+    left: 65%;
+    transform: translate(-50%, -50%);
+    font-size: 5rem;
+    font-weight: bold;
+    color: white;
+    z-index: 1;
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        width: 100%;
+        max-width: none;
+    }
+}

@@ -1,20 +1,36 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Подтверждение</title>
-    <link rel="stylesheet" href="/static/style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ChatsApp</title>
+    <link rel="stylesheet" href="/static/style.css" />
 </head>
 
 <body>
-    <h1>Введите код подтверждения</h1>
-    <form action="/auth/verify" method="POST">
-        <label for="code">Код:</label>
-        <input type="text" id="code" name="code" required>
-        <button type="submit">Подтвердить</button>
-    </form>
+    <div class="background"></div>
+
+    <div class="form-container-register">
+        <h1 class="title">ChatsApp</h1>
+
+        <form action="/auth/verify" method="post">
+            <!-- Поле для ввода имени пользователя -->
+            <div class="input-group">
+                <i class="icon">
+                </i>
+                <input type="text" name="username" placeholder="six-digit code" required />
+            </div>
+
+            <button class="login-button" type="submit">Verify</button>
+
+            <div class="signup-link">
+                <a href="/login">Already have an account?</a>
+            </div>
+        </form>
+    </div>
+
+    <script src="/static/app.js"></script>
 </body>
 
 </html>

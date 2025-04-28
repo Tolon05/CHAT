@@ -9,9 +9,17 @@
     <link rel="stylesheet" href="/static/dashboard.css">
     <style>
         .message-list {
-            padding: 10px;
-            overflow-y: auto;
             flex-grow: 1;
+            /* Занимает оставшееся пространство */
+            overflow-y: auto;
+            /* Только эта область прокручивается */
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            /* Сообщения выравниваются сверху */
+            min-height: 0;
+            /* Позволяет корректно работать в flex-контейнере */
         }
 
         .message {
@@ -53,14 +61,14 @@
         }
 
         .message.received .message-content {
-            background-color: #2a3e4c;
+            background-color: #1F392D;
             color: white;
-            border-radius: 10px;
+            border-radius: 5px;
             padding: 8px 12px;
         }
 
         .message.sent .message-content {
-            background-color: #3e5c76;
+            background-color: #48926F;
             color: white;
             border-radius: 10px;
             padding: 8px 12px;
@@ -130,7 +138,7 @@
                 <div class="contact-item {% if selected_contact and user and selected_contact[0].id == user.id %}selected{% endif %}"
                     data-contact-id="{{ user.id if user else '' }}" data-room-id="{{ room.id if room else '' }}"
                     data-username="{{ user.username if user else 'No user' }}"
-                    data-avatar="{% if contact_obj and contact_obj.avatar_data %}data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}{% else %}default{% endif %}">
+                    data-avatar="{% if contact_objedx and contact_obj.avatar_data %}data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}{% else %}default{% endif %}">
                     <div class="contact-avatar">
                         {% if contact_obj and contact_obj.avatar_data %}
                         <img src="data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}" alt="avatar"
@@ -255,36 +263,10 @@
         const micIcon = document.getElementById("mic-icon");
         const sendIcon = document.getElementById("send-icon");
         const userId = "{{ request.state.user_id }}";
+        let currentRoomId = null;
+        let chatSocket = null;
 
-        document.getElementById('send-icon').addEventListener('click', function () {
-            const messageInput = document.getElementById('message-input');
-            const contactItem = document.querySelector('.contact-item.selected');
-
-            if (!contactItem) {
-                alert("Выберите контакт!");
-                return;
-            }
-
-            const roomId = contactItem.getAttribute('data-room-id');
-            const message = messageInput.value.trim();
-
-            if (!roomId) {
-                alert("Ошибка: ID комнаты не найден!");
-                return;
-            }
-
-            if (!message) {
-                alert("Сообщение не может быть пустым!");
-                return;
-            }
-
-            getToken().then(token => {
-                sendMessage(roomId, message, token);
-            }).catch(error => {
-                alert(error);
-            });
-        });
-
+        // Функция для получения токена
         function getCookie(name) {
             const value = `; ${document.cookie}`;
             const parts = value.split(`; ${name}=`);
@@ -351,8 +333,44 @@
             });
         }
 
+        // Функция для создания элемента сообщения
+        function createMessageElement(msg, isSent) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(isSent ? 'sent' : 'received');
+            messageDiv.setAttribute('data-message-id', msg.message_id || '');
+
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('message-content');
+
+            const textDiv = document.createElement('div');
+            textDiv.classList.add('message-text');
+            textDiv.textContent = msg.content || msg.message;
+            contentDiv.appendChild(textDiv);
+
+            const timeDiv = document.createElement('div');
+            timeDiv.classList.add('message-time');
+            timeDiv.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            contentDiv.appendChild(timeDiv);
+
+            messageDiv.appendChild(contentDiv);
+
+            return messageDiv;
+        }
+
+        // Функция для проверки, нужно ли прокручивать вниз
+        function scrollToBottomIfNeeded(messageList) {
+            const isOverflowing = messageList.scrollHeight > messageList.clientHeight;
+            if (isOverflowing) {
+                messageList.scrollTop = messageList.scrollHeight;
+            }
+        }
+
+        // Функция для отправки сообщения
         function sendMessage(roomId, message, token) {
             const socket = new WebSocket(`ws://localhost:8000/ws/send_message/${roomId}`);
+            const messageList = document.getElementById('message-list');
+            const tempMessageId = 'temp-' + Date.now(); // Уникальный временный ID
 
             socket.onopen = function () {
                 const payload = {
@@ -360,6 +378,18 @@
                     token: token
                 };
                 socket.send(JSON.stringify(payload));
+
+                // Локально добавляем сообщение в message-list
+                const tempMessage = {
+                    message: message,
+                    sender_id: userId,
+                    timestamp: new Date().toISOString(),
+                    message_id: tempMessageId
+                };
+                const messageElement = createMessageElement(tempMessage, true);
+                messageList.appendChild(messageElement);
+                scrollToBottomIfNeeded(messageList);
+
                 document.getElementById('message-input').value = '';
             };
 
@@ -367,13 +397,28 @@
                 const data = JSON.parse(event.data);
                 if (data.event === "message_sent") {
                     console.log("Сообщение отправлено:", data.message);
+                    // Удаляем временное сообщение
+                    const tempMessageElement = messageList.querySelector(`[data-message-id="${tempMessageId}"]`);
+                    if (tempMessageElement) {
+                        tempMessageElement.remove();
+                    }
+                    // Добавляем подтвержденное сообщение
+                    const confirmedMessage = {
+                        message: data.message,
+                        sender_id: userId,
+                        timestamp: new Date().toISOString(),
+                        message_id: data.message_id || Date.now()
+                    };
+                    const messageElement = createMessageElement(confirmedMessage, true);
+                    messageList.appendChild(messageElement);
+                    scrollToBottomIfNeeded(messageList);
                 } else if (data.event === "error") {
                     alert(`Ошибка: ${data.message}`);
                 }
             };
 
             socket.onclose = function () {
-                console.log("WebSocket закрыт");
+                console.log("WebSocket для отправки сообщения закрыт");
             };
 
             socket.onerror = function (error) {
@@ -381,6 +426,36 @@
                 alert("Ошибка соединения!");
             };
         }
+
+        // Обработчик отправки сообщения
+        document.getElementById('send-icon').addEventListener('click', function () {
+            const messageInput = document.getElementById('message-input');
+            const contactItem = document.querySelector('.contact-item.selected');
+
+            if (!contactItem) {
+                alert("Выберите контакт!");
+                return;
+            }
+
+            const roomId = contactItem.getAttribute('data-room-id');
+            const message = messageInput.value.trim();
+
+            if (!roomId) {
+                alert("Ошибка: ID комнаты не найден!");
+                return;
+            }
+
+            if (!message) {
+                alert("Сообщение не может быть пустым!");
+                return;
+            }
+
+            getToken().then(token => {
+                sendMessage(roomId, message, token);
+            }).catch(error => {
+                alert(error);
+            });
+        });
 
         input.addEventListener("input", () => {
             if (input.value.trim() !== "") {
@@ -394,8 +469,8 @@
 
         micIcon.classList.add("active");
 
+        // WebSocket для отслеживания онлайна
         const onlineUsers = new Set();
-
         let ws;
         if (userId) {
             ws = new WebSocket(`ws://localhost:8000/ws/online/${userId}`);
@@ -450,18 +525,67 @@
             }
         }
 
-        let selectedContact = null;
+        // Загрузка сообщений и обработка WebSocket для чата
+        async function loadMessages(roomId) {
+            if (chatSocket) {
+                chatSocket.close();
+            }
 
+            chatSocket = new WebSocket(`ws://localhost:8000/ws/chat/${roomId}`);
+            const messageList = document.getElementById('message-list');
+
+            chatSocket.onopen = function () {
+                console.log("WebSocket для чата открыт:", roomId);
+                getToken().then(token => {
+                    chatSocket.send(JSON.stringify({ token: token }));
+                }).catch(error => {
+                    console.error("Ошибка получения токена:", error);
+                });
+            };
+
+            chatSocket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                if (data.event === "message_history") {
+                    messageList.innerHTML = '';
+                    data.messages.forEach(msg => {
+                        const isSent = String(msg.sender_id) === String(userId);
+                        const messageElement = createMessageElement(msg, isSent);
+                        messageList.appendChild(messageElement);
+                    });
+                    scrollToBottomIfNeeded(messageList);
+                } else if (data.event === "new_message") {
+                    // Пропускаем сообщение, если оно от текущего пользователя и уже добавлено
+                    if (String(data.sender_id) === String(userId) && messageList.querySelector(`[data-message-id="${data.message_id}"]`)) {
+                        return;
+                    }
+                    const isSent = String(data.sender_id) === String(userId);
+                    const messageElement = createMessageElement(data, isSent);
+                    messageList.appendChild(messageElement);
+                    scrollToBottomIfNeeded(messageList);
+                } else if (data.event === "error") {
+                    messageList.innerHTML = `<div class="error">${data.message}</div>`;
+                }
+            };
+
+            chatSocket.onclose = function () {
+                console.log("WebSocket для чата закрыт");
+            };
+
+            chatSocket.onerror = function (error) {
+                console.error("Ошибка WebSocket для чата:", error);
+                messageList.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+            };
+        }
+
+        // Обработчики событий для контактов и фильтров
         document.addEventListener('DOMContentLoaded', async function () {
             const btnAll = document.getElementById('btn-all');
             const btnUnread = document.getElementById('btn-unread');
             const btnGroups = document.getElementById('btn-groups');
-
             const chatAreaCon = document.getElementById('chat-area-con');
             const chatArea = document.getElementById('chat-area');
             const chatTitle = document.getElementById('current-chat-title');
             const chatStatus = document.getElementById('chat-status');
-            const messageList = document.getElementById('message-list');
 
             async function setActiveFilterBtn(activeBtn) {
                 const filterBtns = [btnAll, btnUnread, btnGroups];
@@ -483,94 +607,7 @@
 
             await setActiveFilterBtn(btnAll);
 
-            let currentRoomId = null;
-            let chatSocket = null;
-
-            function createMessageElement(msg, isSent) {
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('message');
-                messageDiv.classList.add(isSent ? 'sent' : 'received');
-
-                const avatarImg = document.createElement('img');
-                avatarImg.classList.add('avatar');
-                const contactItem = document.querySelector(`.contact-item[data-contact-id="${msg.sender_id}"]`);
-                if (contactItem) {
-                    const avatarSrc = contactItem.getAttribute('data-avatar');
-                    avatarImg.src = avatarSrc !== 'default' ? avatarSrc : 'https://via.placeholder.com/40';
-                } else {
-                    avatarImg.src = 'https://via.placeholder.com/40';
-                }
-                messageDiv.appendChild(avatarImg);
-
-                const contentDiv = document.createElement('div');
-                contentDiv.classList.add('message-content');
-
-                const senderDiv = document.createElement('div');
-                senderDiv.classList.add('message-sender');
-                senderDiv.textContent = contactItem ? contactItem.getAttribute('data-username') : msg.sender_id;
-                contentDiv.appendChild(senderDiv);
-
-                const textDiv = document.createElement('div');
-                textDiv.classList.add('message-text');
-                textDiv.textContent = msg.content || msg.message;
-                contentDiv.appendChild(textDiv);
-
-                const timeDiv = document.createElement('div');
-                timeDiv.classList.add('message-time');
-                timeDiv.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                contentDiv.appendChild(timeDiv);
-
-                messageDiv.appendChild(contentDiv);
-
-                return messageDiv;
-            }
-
-            async function loadMessages(roomId) {
-                if (chatSocket) {
-                    chatSocket.close();
-                }
-
-                chatSocket = new WebSocket(`ws://localhost:8000/ws/chat/${roomId}`);
-
-                chatSocket.onopen = function () {
-                    console.log("WebSocket для чата открыт:", roomId);
-                    getToken().then(token => {
-                        chatSocket.send(JSON.stringify({ token: token }));
-                    }).catch(error => {
-                        console.error("Ошибка получения токена:", error);
-                        messageList.innerHTML = '<div class="error">Ошибка аутентификации</div>';
-                    });
-                };
-
-                chatSocket.onmessage = function (event) {
-                    const data = JSON.parse(event.data);
-                    if (data.event === "message_history") {
-                        messageList.innerHTML = '';
-                        data.messages.forEach(msg => {
-                            const isSent = String(msg.sender_id) === String(userId);
-                            const messageElement = createMessageElement(msg, isSent);
-                            messageList.appendChild(messageElement);
-                        });
-                        messageList.scrollTop = messageList.scrollHeight;
-                    } else if (data.event === "new_message") {
-                        const isSent = String(data.sender_id) === String(userId);
-                        const messageElement = createMessageElement(data, isSent);
-                        messageList.appendChild(messageElement);
-                        messageList.scrollTop = messageList.scrollHeight;
-                    } else if (data.event === "error") {
-                        messageList.innerHTML = `<div class="error">${data.message}</div>`;
-                    }
-                };
-
-                chatSocket.onclose = function () {
-                    console.log("WebSocket для чата закрыт");
-                };
-
-                chatSocket.onerror = function (error) {
-                    console.error("Ошибка WebSocket для чата:", error);
-                    messageList.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
-                };
-            }
+            let selectedContact = null;
 
             const urlParams = new URLSearchParams(window.location.search);
             const selectedContactId = urlParams.get('selected_contact_id');
@@ -580,7 +617,7 @@
                     selectedContact.classList.add('selected');
                     await updateStatus(selectedContactId);
                     chatAreaCon.style.display = 'none';
-                    // chatArea.style.display = 'block';
+                    chatArea.style.display = 'block';
 
                     const contactName = selectedContact.querySelector('.contact-name').textContent;
                     chatTitle.textContent = contactName;
@@ -604,7 +641,7 @@
                     selectedContact = contactItem;
                     selectedContact.classList.add('selected');
                     chatAreaCon.style.display = 'none';
-                    // chatArea.style.display = 'block';
+                    chatArea.style.display = 'block';
 
                     const contactName = contactItem.querySelector('.contact-name').textContent;
                     chatTitle.textContent = contactName;
@@ -612,11 +649,11 @@
                     const contactId = contactItem.getAttribute('data-contact-id');
                     if (contactId) {
                         const chatUrl = `/dash/?selected_contact_id=${contactId}`;
-                        window.location.href = chatUrl;
+                        window.history.pushState({}, '', chatUrl);
                         await updateStatus(contactId);
 
                         currentRoomId = contactItem.getAttribute('data-room-id');
-                        if (currentRoomId) {
+                        if (currentROOMId) {
                             await loadMessages(currentRoomId);
                         }
                     }

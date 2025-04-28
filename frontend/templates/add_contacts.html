@@ -53,7 +53,7 @@
             
             <!-- Контакты -->
             <div class="contact-list">
-                <div class="contact-label">Контакты в ChatsApp</div>
+                <div class="contact-label" style="color: white; padding: 10px; margin-left: 8px;">Контакты в ChatsApp</div>
             
                 {% if contacts %}
                 {% for contact in contacts %}
@@ -72,12 +72,12 @@
                     </div>
                     <div class="contact-info">
                         <div class="contact-name">{{ contact.username }}</div>
-                        <div class="contact-last-msg">{{ contact.about }}</div> <!-- Можно будет добавить последнее сообщение позже -->
+                        <div class="contact-last-msg">{{ contact.about if contact.about else "" }}</div> <!-- Можно будет добавить последнее сообщение позже -->
                     </div>
                 </div>
                 {% endfor %}
                 {% else %}
-                <p>У вас пока нет контактов.</p>
+                <p style="color: white; margin-left: 18px;">У вас пока нет контактов.</p>
                 {% endif %}
             </div>
 
