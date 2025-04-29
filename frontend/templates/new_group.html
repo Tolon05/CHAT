@@ -105,26 +105,11 @@
                 return;
             }
 
-            try {
-                const res = await fetch('http://localhost:8000/dash/groups', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contact_ids: Array.from(selectedContacts) })
-                });
+            // Сохраняем выбранные контакты в localStorage
+            localStorage.setItem('selectedContacts', JSON.stringify(Array.from(selectedContacts)));
 
-                if (!res.ok) throw new Error('Failed to create group');
-                const data = await res.json();
-                alert(data.message);
-
-                // Clear selection after successful group creation
-                selectedContacts.clear();
-                document.querySelectorAll('.checkmark-container').forEach(container => {
-                    container.innerHTML = '';
-                });
-            } catch (error) {
-                console.error('Error creating group:', error);
-                alert('Failed to create group. Please try again.');
-            }
+            // Переходим на страницу создания группы
+            window.location.href = '/dash/create_group'; // Путь к новой странице
         });
     </script>
 </body>

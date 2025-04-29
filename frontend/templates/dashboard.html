@@ -10,16 +10,12 @@
     <style>
         .message-list {
             flex-grow: 1;
-            /* Занимает оставшееся пространство */
             overflow-y: auto;
-            /* Только эта область прокручивается */
             padding: 20px;
             display: flex;
             flex-direction: column;
             justify-content: flex-start;
-            /* Сообщения выравниваются сверху */
             min-height: 0;
-            /* Позволяет корректно работать в flex-контейнере */
         }
 
         .message {
@@ -39,11 +35,12 @@
         }
 
         .message .avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            width: 40px !important;
+            height: 40px !important;
+            border-radius: 50% !important;
             margin-right: 10px;
             flex-shrink: 0;
+            overflow: hidden !important;
         }
 
         .message.received .avatar {
@@ -53,6 +50,13 @@
         .message.sent .avatar {
             margin-left: 10px;
             order: 2;
+        }
+
+        .message .avatar img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+            border-radius: 50% !important;
         }
 
         .message-content {
@@ -92,9 +96,97 @@
             text-align: right;
         }
 
+        .date-divider {
+            text-align: center;
+            margin: 10px 0;
+            color: #b0b0b0;
+            font-size: 12px;
+            position: relative;
+        }
+
+        .date-divider::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: #b0b0b0;
+            z-index: -1;
+        }
+
+        .date-divider span {
+            background: #121212;
+            padding: 0 10px;
+        }
+
         .error {
             color: red;
             text-align: center;
+        }
+
+        .contact-item.group {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .chat-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-actions .action-icon {
+            cursor: pointer;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: 40px;
+            right: 10px;
+            background-color: #1F392D;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+        }
+
+        .dropdown-menu.active {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 10px 15px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .dropdown-item:hover {
+            background-color: #48926F;
+        }
+
+        .message-context-menu {
+            position: absolute;
+            background-color: #1F392D;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+        }
+
+        .message-context-menu.active {
+            display: block;
+        }
+
+        .context-menu-item {
+            padding: 10px 15px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .context-menu-item:hover {
+            background-color: #48926F;
         }
     </style>
 </head>
@@ -123,23 +215,24 @@
                     </i>
                 </div>
             </div>
-
-            <div class="filter-buttons">
-                <button class="filter-btn active" id="btn-all">Все</button>
-                <button class="filter-btn" id="btn-unread">Непрочитанные</button>
-                <button class="filter-btn" id="btn-groups">Группы</button>
-            </div>
-
-            <div class="contact-list">
+            <div class="contact-list" id="contact-list">
                 {% if contacts %}
                 {% for contact in contacts %}
-                {% set room, user = contact %}
+                {% set room, user, last_msg_content, sender_username = contact %}
                 {% set contact_obj = contact_data_dict.get(user.id) if user else None %}
-                <div class="contact-item {% if selected_contact and user and selected_contact[0].id == user.id %}selected{% endif %}"
+                <div class="contact-item {% if room and room.type == 'group' %}group{% endif %} {% if selected_contact and user and selected_contact[1] and selected_contact[1].id == user.id %}selected{% endif %}"
                     data-contact-id="{{ user.id if user else '' }}" data-room-id="{{ room.id if room else '' }}"
-                    data-username="{{ user.username if user else 'No user' }}"
-                    data-avatar="{% if contact_objedx and contact_obj.avatar_data %}data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}{% else %}default{% endif %}">
+                    data-username="{{ user.username if user else room.name if room else '' }}"
+                    data-room-type="{{ room.type if room else 'private' }}"
+                    data-avatar="{% if contact_obj and contact_obj.avatar_data %}data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}{% else %}default{% endif %}">
                     <div class="contact-avatar">
+                        {% if room and room.type == 'group' %}
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"
+                            fill="currentColor" class="contact-avatar-icon">
+                            <path
+                                d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                        </svg>
+                        {% else %}
                         {% if contact_obj and contact_obj.avatar_data %}
                         <img src="data:image/png;base64,{{ contact_obj.avatar_data | b64encode }}" alt="avatar"
                             class="contact-avatar-img" width="50" height="50">
@@ -150,10 +243,17 @@
                                 d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
                         </svg>
                         {% endif %}
+                        {% endif %}
                     </div>
                     <div class="contact-info">
-                        <div class="contact-name">{{ user.username if user else 'No user' }}</div>
-                        <div class="contact-last-msg">—</div>
+                        <div class="contact-name">{{ user.username if user else room.name if room else '' }}</div>
+                        <div class="contact-last-msg">
+                            {% if last_msg_content %}
+                            {{ sender_username }}: {{ last_msg_content }}
+                            {% else %}
+                            —
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
                 {% endfor %}
@@ -161,7 +261,6 @@
                 <p class="po-umol" style="color: white; padding: 8px 14px; font-size: 18;">У вас пока нет контактов.</p>
                 {% endif %}
             </div>
-
             <div class="nav-icons">
                 <div class="nav-item" id="nav-chats">
                     <div class="nav-circle">
@@ -190,9 +289,7 @@
                 </div>
             </div>
         </div>
-
         <div class="chat-area-con" id="chat-area-con"></div>
-
         <div class="chat-area" id="chat-area">
             <div class="chat-header">
                 <div class="chat-back" id="chat-back">
@@ -203,6 +300,12 @@
                         {% if selected_contact_user and selected_contact_user.avatar_data %}
                         <img src="data:image/png;base64,{{ selected_contact_user.avatar_data | b64encode }}"
                             alt="avatar" class="contact-avatar-img" width="50" height="50">
+                        {% elif selected_contact_room and selected_contact_room.type == 'group' %}
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"
+                            fill="currentColor" class="contact-avatar-icon">
+                            <path
+                                d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z" />
+                        </svg>
                         {% else %}
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"
                             fill="currentColor" class="contact-avatar-icon">
@@ -214,7 +317,7 @@
                     <div style="display: flex; flex-direction: column;">
                         <div class="chat-title" id="current-chat-title" style="font-weight: bold; color: white;">
                             {% if selected_contact %}
-                            {{ selected_contact[1].username }}
+                            {{ selected_contact[1].username if selected_contact[1] else selected_contact[2].name }}
                             {% else %}
                             Выберите контакт
                             {% endif %}
@@ -223,27 +326,15 @@
                     </div>
                 </div>
                 <div class="chat-actions">
-                    <i style="margin-top: 8px;">
-                        <svg width="25" height="25" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path fill-rule="evenodd" clip-rule="evenodd"
-                                d="M0 11.2511C0 17.464 5.05263 22.5005 11.3684 22.5005C13.8947 22.5005 16.2406 21.6204 18.2256 20.1422C18.2256 20.294 18.406 20.4349 18.406 20.5614L27.4286 29.5609C27.9699 30.1464 29.0526 30.1464 29.594 29.5609C30.1353 28.9754 30.1353 28.0248 29.594 27.4393L20.5714 18.4399C20.391 18.3134 20.391 18.2158 20.2105 18.1435C21.6541 16.2388 22.5564 13.848 22.5564 11.2511C22.5564 5.03644 17.5038 0 11.3684 0C5.05263 0 0 5.03644 0 11.2511ZM3.06836 11.2511C3.06836 6.69354 6.67738 2.99979 11.3691 2.99979C15.8804 2.99979 19.4894 6.69354 19.4894 11.2511C19.4894 15.8069 15.8804 19.5006 11.3691 19.5006C6.67738 19.5006 3.06836 15.8069 3.06836 11.2511Z"
-                                fill="white" />
-                        </svg>
-                    </i>
-                    <i>
-                        <svg width="40" height="40" viewBox="0 0 50 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path
-                                d="M25.0002 20C27.2918 20 29.1668 17.75 29.1668 15C29.1668 12.25 27.2918 10 25.0002 10C22.7085 10 20.8335 12.25 20.8335 15C20.8335 17.75 22.7085 20 25.0002 20ZM25.0002 25C22.7085 25 20.8335 27.25 20.8335 30C20.8335 32.75 22.7085 35 25.0002 35C27.2918 35 29.1668 32.75 29.1668 30C29.1668 27.25 27.2918 25 25.0002 25ZM25.0002 40C22.7085 40 20.8335 42.25 20.8335 45C20.8335 47.75 22.7085 50 25.0002 50C27.2918 50 29.1668 47.75 29.1668 45C29.1668 42.25 27.2918 40 25.0002 40Z"
-                                fill="white" />
-                        </svg>
-                    </i>
+                    <i class="fas fa-ellipsis-v action-icon" id="chat-menu" title="Меню"></i>
+                    <div class="dropdown-menu" id="dropdown-menu">
+                        <div class="dropdown-item" id="clear-chat">Очистить чат</div>
+                    </div>
                 </div>
             </div>
-
             <div class="message-list" id="message-list">
                 <div class="loading">Select a chat to view messages</div>
             </div>
-
             <div class="message-input-area">
                 <div class="message-input">
                     <i class="far fa-smile icon-left"></i>
@@ -255,9 +346,11 @@
                     <i class="fas fa-paper-plane" id="send-icon"></i>
                 </div>
             </div>
+            <div class="message-context-menu" id="message-context-menu">
+                <div class="context-menu-item" id="delete-message">Удалить</div>
+            </div>
         </div>
     </div>
-
     <script>
         const input = document.getElementById("message-input");
         const micIcon = document.getElementById("mic-icon");
@@ -265,6 +358,7 @@
         const userId = "{{ request.state.user_id }}";
         let currentRoomId = null;
         let chatSocket = null;
+        let lastDate = null;
 
         // Функция для получения токена
         function getCookie(name) {
@@ -277,7 +371,6 @@
 
         function getTokenFromIndexedDB() {
             const request = indexedDB.open('userKeysDB', 2);
-
             return new Promise((resolve, reject) => {
                 request.onupgradeneeded = function (event) {
                     const db = event.target.result;
@@ -285,13 +378,11 @@
                         db.createObjectStore('tokens', { keyPath: 'id', autoIncrement: true });
                     }
                 };
-
                 request.onsuccess = function (event) {
                     const db = event.target.result;
                     const transaction = db.transaction('tokens', 'readonly');
                     const store = transaction.objectStore('tokens');
                     const getRequest = store.get(1);
-
                     getRequest.onsuccess = function () {
                         if (getRequest.result) {
                             resolve(getRequest.result.token);
@@ -299,12 +390,10 @@
                             reject('Токен не найден в IndexedDB');
                         }
                     };
-
                     getRequest.onerror = function () {
                         reject('Ошибка при получении токена из IndexedDB');
                     };
                 };
-
                 request.onerror = function (event) {
                     reject(`Ошибка при открытии IndexedDB: ${event.target.error}`);
                 };
@@ -315,7 +404,6 @@
             return new Promise((resolve, reject) => {
                 let token = getCookie('access_token');
                 console.log("Токен из cookies:", token);
-
                 if (token) {
                     resolve(token);
                 } else {
@@ -333,28 +421,83 @@
             });
         }
 
+        // Функция для форматирования даты
+        function formatDate(timestamp) {
+            const date = new Date(timestamp);
+            const today = new Date();
+            if (date.toDateString() === today.toDateString()) {
+                return "Сегодня";
+            }
+            const yesterday = new Date(today);
+            yesterday.setDate(today.getDate() - 1);
+            if (date.toDateString() === yesterday.toDateString()) {
+                return "Вчера";
+            }
+            return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+        }
+
+        // Функция для создания разделителя даты
+        function createDateDivider(dateStr) {
+            const divider = document.createElement('div');
+            divider.classList.add('date-divider');
+            divider.innerHTML = `<span>${dateStr}</span>`;
+            return divider;
+        }
+
         // Функция для создания элемента сообщения
         function createMessageElement(msg, isSent) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message');
             messageDiv.classList.add(isSent ? 'sent' : 'received');
             messageDiv.setAttribute('data-message-id', msg.message_id || '');
+            messageDiv.setAttribute('data-sender-id', msg.sender_id);
 
+            // Аватар
+            const avatarDiv = document.createElement('div');
+            avatarDiv.classList.add('avatar');
+            if (msg.avatar_data) {
+                const img = document.createElement('img');
+                img.src = `data:image/png;base64,${msg.avatar_data}`;
+                img.alt = 'avatar';
+                img.width = 40;
+                img.height = 40;
+                avatarDiv.appendChild(img);
+            } else {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('width', '24');
+                svg.setAttribute('height', '24');
+                svg.setAttribute('fill', 'currentColor');
+                svg.innerHTML = '<path d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>';
+                avatarDiv.appendChild(svg);
+            }
+            messageDiv.appendChild(avatarDiv);
+
+            // Контент сообщения
             const contentDiv = document.createElement('div');
             contentDiv.classList.add('message-content');
 
+            // Имя отправителя (только для полученных сообщений)
+            if (!isSent) {
+                const senderDiv = document.createElement('div');
+                senderDiv.classList.add('message-sender');
+                senderDiv.textContent = msg.sender_username || 'Unknown';
+                contentDiv.appendChild(senderDiv);
+            }
+
+            // Текст сообщения
             const textDiv = document.createElement('div');
             textDiv.classList.add('message-text');
             textDiv.textContent = msg.content || msg.message;
             contentDiv.appendChild(textDiv);
 
+            // Время
             const timeDiv = document.createElement('div');
             timeDiv.classList.add('message-time');
             timeDiv.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             contentDiv.appendChild(timeDiv);
 
             messageDiv.appendChild(contentDiv);
-
             return messageDiv;
         }
 
@@ -370,7 +513,7 @@
         function sendMessage(roomId, message, token) {
             const socket = new WebSocket(`ws://localhost:8000/ws/send_message/${roomId}`);
             const messageList = document.getElementById('message-list');
-            const tempMessageId = 'temp-' + Date.now(); // Уникальный временный ID
+            const tempMessageId = 'temp-' + Date.now();
 
             socket.onopen = function () {
                 const payload = {
@@ -379,13 +522,19 @@
                 };
                 socket.send(JSON.stringify(payload));
 
-                // Локально добавляем сообщение в message-list
+                // Локально добавляем сообщение
                 const tempMessage = {
                     message: message,
                     sender_id: userId,
                     timestamp: new Date().toISOString(),
                     message_id: tempMessageId
                 };
+                const messageDate = formatDate(tempMessage.timestamp);
+                if (lastDate !== messageDate) {
+                    const divider = createDateDivider(messageDate);
+                    messageList.appendChild(divider);
+                    lastDate = messageDate;
+                }
                 const messageElement = createMessageElement(tempMessage, true);
                 messageList.appendChild(messageElement);
                 scrollToBottomIfNeeded(messageList);
@@ -397,20 +546,15 @@
                 const data = JSON.parse(event.data);
                 if (data.event === "message_sent") {
                     console.log("Сообщение отправлено:", data.message);
-                    // Удаляем временное сообщение
+                    // Обновляем временное сообщение
                     const tempMessageElement = messageList.querySelector(`[data-message-id="${tempMessageId}"]`);
                     if (tempMessageElement) {
-                        tempMessageElement.remove();
+                        tempMessageElement.setAttribute('data-message-id', data.message_id);
+                        const textDiv = tempMessageElement.querySelector('.message-text');
+                        textDiv.textContent = data.message;
+                        const timeDiv = tempMessageElement.querySelector('.message-time');
+                        timeDiv.textContent = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     }
-                    // Добавляем подтвержденное сообщение
-                    const confirmedMessage = {
-                        message: data.message,
-                        sender_id: userId,
-                        timestamp: new Date().toISOString(),
-                        message_id: data.message_id || Date.now()
-                    };
-                    const messageElement = createMessageElement(confirmedMessage, true);
-                    messageList.appendChild(messageElement);
                     scrollToBottomIfNeeded(messageList);
                 } else if (data.event === "error") {
                     alert(`Ошибка: ${data.message}`);
@@ -427,34 +571,156 @@
             };
         }
 
+        // Функция для удаления сообщения
+        function deleteMessage(roomId, messageId, token) {
+            const socket = new WebSocket(`ws://localhost:8000/ws/delete_message/${roomId}/${messageId}`);
+            socket.onopen = function () {
+                socket.send(JSON.stringify({ token: token }));
+            };
+            socket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                if (data.event === "message_deleted") {
+                    console.log("Сообщение удалено:", data.message_id);
+                    const messageElement = document.querySelector(`[data-message-id="${data.message_id}"]`);
+                    if (messageElement) {
+                        messageElement.remove();
+                    }
+                } else if (data.event === "error") {
+                    alert(`Ошибка: ${data.message}`);
+                }
+            };
+            socket.onclose = function () {
+                console.log("WebSocket для удаления сообщения закрыт");
+            };
+            socket.onerror = function (error) {
+                console.error("Ошибка WebSocket:", error);
+                alert("Ошибка соединения!");
+            };
+        }
+
+        // Функция для очистки чата
+        function clearChat(roomId, token) {
+            const socket = new WebSocket(`ws://localhost:8000/ws/clear_chat/${roomId}`);
+            socket.onopen = function () {
+                socket.send(JSON.stringify({ token: token }));
+            };
+            socket.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                if (data.event === "chat_cleared") {
+                    const messageList = document.getElementById('message-list');
+                    messageList.innerHTML = '<div class="loading">Чат очищен</div>';
+                    lastDate = null;
+                } else if (data.event === "error") {
+                    alert(`Ошибка: ${data.message}`);
+                }
+            };
+            socket.onclose = function () {
+                console.log("WebSocket для очистки чата закрыт");
+            };
+            socket.onerror = function (error) {
+                console.error("Ошибка WebSocket:", error);
+                alert("Ошибка соединения!");
+            };
+        }
+
         // Обработчик отправки сообщения
         document.getElementById('send-icon').addEventListener('click', function () {
             const messageInput = document.getElementById('message-input');
             const contactItem = document.querySelector('.contact-item.selected');
-
             if (!contactItem) {
-                alert("Выберите контакт!");
+                alert("Выберите контакт или группу!");
                 return;
             }
-
             const roomId = contactItem.getAttribute('data-room-id');
             const message = messageInput.value.trim();
-
             if (!roomId) {
                 alert("Ошибка: ID комнаты не найден!");
                 return;
             }
-
             if (!message) {
                 alert("Сообщение не может быть пустым!");
                 return;
             }
-
             getToken().then(token => {
                 sendMessage(roomId, message, token);
             }).catch(error => {
                 alert(error);
             });
+        });
+
+        // Обработчик меню и очистки чата
+        const chatMenu = document.getElementById('chat-menu');
+        const dropdownMenu = document.getElementById('dropdown-menu');
+        chatMenu.addEventListener('click', function (e) {
+            e.stopPropagation();
+            dropdownMenu.classList.toggle('active');
+        });
+        document.getElementById('clear-chat').addEventListener('click', function () {
+            const contactItem = document.querySelector('.contact-item.selected');
+            if (!contactItem) {
+                alert("Выберите чат для очистки!");
+                return;
+            }
+            const roomId = contactItem.getAttribute('data-room-id');
+            if (!roomId) {
+                alert("Ошибка: ID комнаты не найден!");
+                return;
+            }
+            if (confirm("Вы уверены, что хотите очистить чат?")) {
+                getToken().then(token => {
+                    clearChat(roomId, token);
+                    dropdownMenu.classList.remove('active');
+                }).catch(error => {
+                    alert(`Ошибка: ${error}`);
+                });
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (!dropdownMenu.contains(e.target) && !chatMenu.contains(e.target)) {
+                dropdownMenu.classList.remove('active');
+            }
+        });
+
+        // Обработчик контекстного меню сообщений
+        const contextMenu = document.getElementById('message-context-menu');
+        let currentMessageId = null;
+        document.getElementById('message-list').addEventListener('contextmenu', function (e) {
+            e.preventDefault();
+            const messageElement = e.target.closest('.message');
+            if (messageElement && messageElement.classList.contains('sent') && messageElement.getAttribute('data-sender-id') === userId) {
+                currentMessageId = messageElement.getAttribute('data-message-id');
+                if (currentMessageId.startsWith('temp-')) {
+                    return; // Игнорируем временные сообщения
+                }
+                contextMenu.style.top = `${e.clientY}px`;
+                contextMenu.style.left = `${e.clientX}px`;
+                contextMenu.classList.add('active');
+            }
+        });
+        document.getElementById('delete-message').addEventListener('click', function () {
+            const contactItem = document.querySelector('.contact-item.selected');
+            if (!contactItem) {
+                alert("Выберите чат!");
+                return;
+            }
+            const roomId = contactItem.getAttribute('data-room-id');
+            if (!roomId) {
+                alert("Ошибка: ID комнаты не найден!");
+                return;
+            }
+            if (confirm("Вы уверены, что хотите удалить это сообщение?")) {
+                getToken().then(token => {
+                    deleteMessage(roomId, currentMessageId, token);
+                    contextMenu.classList.remove('active');
+                }).catch(error => {
+                    alert(`Ошибка: ${error}`);
+                });
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (!contextMenu.contains(e.target)) {
+                contextMenu.classList.remove('active');
+            }
         });
 
         input.addEventListener("input", () => {
@@ -466,7 +732,6 @@
                 micIcon.classList.add("active");
             }
         });
-
         micIcon.classList.add("active");
 
         // WebSocket для отслеживания онлайна
@@ -474,35 +739,28 @@
         let ws;
         if (userId) {
             ws = new WebSocket(`ws://localhost:8000/ws/online/${userId}`);
-
             ws.onopen = () => {
                 console.log("Соединение установлено, пользователь в сети");
             };
-
             ws.onmessage = async function (event) {
                 const data = JSON.parse(event.data);
                 console.log("Получено сообщение: ", data);
-
                 const urlParams = new URLSearchParams(window.location.search);
                 const selectedContactId = urlParams.get('selected_contact_id');
-
                 if (data.event === "online_users_list") {
                     onlineUsers.clear();
                     data.users.forEach(id => onlineUsers.add(String(id)));
                     await updateStatus(selectedContactId);
                 }
-
                 if (data.event === "user_online") {
                     onlineUsers.add(String(data.user_id));
                     await updateStatus(selectedContactId);
                 }
-
                 if (data.event === "user_offline") {
                     onlineUsers.delete(String(data.user_id));
                     await updateStatus(selectedContactId);
                 }
             };
-
             ws.onclose = () => {
                 console.log("Соединение закрыто");
             };
@@ -514,7 +772,6 @@
             if (selectedContactId) {
                 const selectedContact = document.querySelector(`.contact-item[data-contact-id="${selectedContactId}"]`);
                 const statusElement = document.getElementById('chat-status');
-
                 if (selectedContact && statusElement) {
                     if (onlineUsers.has(selectedContactId)) {
                         statusElement.innerText = "в сети";
@@ -530,10 +787,8 @@
             if (chatSocket) {
                 chatSocket.close();
             }
-
             chatSocket = new WebSocket(`ws://localhost:8000/ws/chat/${roomId}`);
             const messageList = document.getElementById('message-list');
-
             chatSocket.onopen = function () {
                 console.log("WebSocket для чата открыт:", roomId);
                 getToken().then(token => {
@@ -542,73 +797,66 @@
                     console.error("Ошибка получения токена:", error);
                 });
             };
-
             chatSocket.onmessage = function (event) {
                 const data = JSON.parse(event.data);
                 if (data.event === "message_history") {
                     messageList.innerHTML = '';
+                    lastDate = null;
                     data.messages.forEach(msg => {
                         const isSent = String(msg.sender_id) === String(userId);
+                        const messageDate = formatDate(msg.timestamp);
+                        if (lastDate !== messageDate) {
+                            const divider = createDateDivider(messageDate);
+                            messageList.appendChild(divider);
+                            lastDate = messageDate;
+                        }
                         const messageElement = createMessageElement(msg, isSent);
                         messageList.appendChild(messageElement);
                     });
                     scrollToBottomIfNeeded(messageList);
                 } else if (data.event === "new_message") {
-                    // Пропускаем сообщение, если оно от текущего пользователя и уже добавлено
+                    // Это событие больше не будет приходить для других пользователей
                     if (String(data.sender_id) === String(userId) && messageList.querySelector(`[data-message-id="${data.message_id}"]`)) {
                         return;
                     }
                     const isSent = String(data.sender_id) === String(userId);
+                    const messageDate = formatDate(data.timestamp);
+                    if (lastDate !== messageDate) {
+                        const divider = createDateDivider(messageDate);
+                        messageList.appendChild(divider);
+                        lastDate = messageDate;
+                    }
                     const messageElement = createMessageElement(data, isSent);
                     messageList.appendChild(messageElement);
                     scrollToBottomIfNeeded(messageList);
+                } else if (data.event === "message_deleted") {
+                    const messageElement = messageList.querySelector(`[data-message-id="${data.message_id}"]`);
+                    if (messageElement) {
+                        messageElement.remove();
+                    }
+                } else if (data.event === "chat_cleared") {
+                    messageList.innerHTML = '<div class="loading">Чат очищен</div>';
+                    lastDate = null;
                 } else if (data.event === "error") {
                     messageList.innerHTML = `<div class="error">${data.message}</div>`;
                 }
             };
-
             chatSocket.onclose = function () {
                 console.log("WebSocket для чата закрыт");
             };
-
             chatSocket.onerror = function (error) {
                 console.error("Ошибка WebSocket для чата:", error);
                 messageList.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
             };
         }
 
-        // Обработчики событий для контактов и фильтров
+        // Обработчики событий для контактов
         document.addEventListener('DOMContentLoaded', async function () {
-            const btnAll = document.getElementById('btn-all');
-            const btnUnread = document.getElementById('btn-unread');
-            const btnGroups = document.getElementById('btn-groups');
             const chatAreaCon = document.getElementById('chat-area-con');
             const chatArea = document.getElementById('chat-area');
             const chatTitle = document.getElementById('current-chat-title');
             const chatStatus = document.getElementById('chat-status');
-
-            async function setActiveFilterBtn(activeBtn) {
-                const filterBtns = [btnAll, btnUnread, btnGroups];
-                filterBtns.forEach(btn => btn?.classList.remove('active'));
-                activeBtn?.classList.add('active');
-            }
-
-            btnAll?.addEventListener('click', async () => {
-                await setActiveFilterBtn(btnAll);
-            });
-
-            btnUnread?.addEventListener('click', async () => {
-                await setActiveFilterBtn(btnUnread);
-            });
-
-            btnGroups?.addEventListener('click', async () => {
-                await setActiveFilterBtn(btnGroups);
-            });
-
-            await setActiveFilterBtn(btnAll);
-
             let selectedContact = null;
-
             const urlParams = new URLSearchParams(window.location.search);
             const selectedContactId = urlParams.get('selected_contact_id');
             if (selectedContactId) {
@@ -618,10 +866,8 @@
                     await updateStatus(selectedContactId);
                     chatAreaCon.style.display = 'none';
                     chatArea.style.display = 'block';
-
                     const contactName = selectedContact.querySelector('.contact-name').textContent;
                     chatTitle.textContent = contactName;
-
                     currentRoomId = selectedContact.getAttribute('data-room-id');
                     if (currentRoomId) {
                         await loadMessages(currentRoomId);
@@ -630,36 +876,32 @@
                     chatArea.style.display = 'none';
                 }
             }
-
             const contactItems = document.querySelectorAll('.contact-item');
             contactItems.forEach(contactItem => {
                 contactItem.addEventListener('click', async function () {
                     contactItems.forEach(item => item.classList.remove('selected'));
-
                     if (selectedContact === contactItem) return;
-
                     selectedContact = contactItem;
                     selectedContact.classList.add('selected');
                     chatAreaCon.style.display = 'none';
                     chatArea.style.display = 'block';
-
                     const contactName = contactItem.querySelector('.contact-name').textContent;
                     chatTitle.textContent = contactName;
-
                     const contactId = contactItem.getAttribute('data-contact-id');
-                    if (contactId) {
+                    const roomType = contactItem.getAttribute('data-room-type');
+                    if (roomType === 'group') {
+                        chatStatus.innerText = '';
+                    } else if (contactId) {
                         const chatUrl = `/dash/?selected_contact_id=${contactId}`;
                         window.history.pushState({}, '', chatUrl);
                         await updateStatus(contactId);
-
-                        currentRoomId = contactItem.getAttribute('data-room-id');
-                        if (currentROOMId) {
-                            await loadMessages(currentRoomId);
-                        }
+                    }
+                    currentRoomId = contactItem.getAttribute('data-room-id');
+                    if (currentRoomId) {
+                        await loadMessages(currentRoomId);
                     }
                 });
             });
-
             if (!selectedContact) {
                 chatArea.style.display = 'none';
             }

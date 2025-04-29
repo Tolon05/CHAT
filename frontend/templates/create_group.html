@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChatsApp</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/new_contact.css">
+</head>
+
+<body>
+
+    <!-- Main Container -->
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <!-- Search -->
+            <div class="container">
+                <a class="back-arrow" href="/dash/new_group">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+
+                <form id="addContactForm">
+                    <div class="input-group">
+                        <i class="fas fa-user"></i>
+                        <input type="text" placeholder="Enter the group name" id="group-name" name="group-name" required>
+                    </div>
+                    <button type="submit" class="add-btn">Add group</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Chat Area -->
+        <div class="chat-area-con" id="chat-area-con"></div>
+    </div>
+
+    <script>
+        document.getElementById('addContactForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const groupName = document.getElementById('group-name').value.trim();
+            const selectedContacts = JSON.parse(localStorage.getItem('selectedContacts')) || [];
+
+            if (!groupName) {
+                alert('Пожалуйста, введите название группы.');
+                return;
+            }
+
+            if (selectedContacts.length === 0) {
+                alert('Контакты не выбраны. Пожалуйста, выберите контакты.');
+                return;
+            }
+
+            try {
+                const res = await fetch('http://127.0.0.1:8000/dash/add_group', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include', // Отправляем куки автоматически
+                    body: JSON.stringify({
+                        group_name: groupName,
+                        contact_ids: selectedContacts
+                    })
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.detail || 'Не удалось создать группу');
+                }
+
+                const data = await res.json();
+                alert(data.message);
+
+                localStorage.removeItem('selectedContacts');
+                window.location.href = '/dash/add_con';
+            } catch (error) {
+                console.error('Ошибка при создании группы:', error);
+                if (error.message.includes('Неавторизован')) {
+                    window.location.href = '/login';
+                } else {
+                    alert(`Не удалось создать группу: ${error.message}`);
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>

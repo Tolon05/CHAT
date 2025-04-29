@@ -286,7 +286,7 @@ body {
 
 .contact-list {
     overflow-y: auto;
-    max-height: calc(100vh - 420px);
+    max-height: calc(100vh - 200px);
     padding: 10px 30px;
     display: flex;
     flex-direction: column;
