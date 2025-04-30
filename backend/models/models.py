@@ -111,12 +111,13 @@ class Message(Base):
     id = Column(Integer, primary_key=True, index=True)
     sender_id = Column(Integer, ForeignKey("users.id"), index=True)
     room_id = Column(Integer, ForeignKey("chat_rooms.id"), index=True)
-    content = Column(String)
+    content = Column(String, nullable=True)  # Текст или смайлики
+    image_data = Column(LargeBinary, nullable=True)  # Бинарные данные изображения
     timestamp = Column(DateTime, default=datetime.now(timezone.utc), index=True)
-    read_status = relationship("MessageReadStatus", back_populates="message", cascade="all, delete")
 
     sender = relationship("User", back_populates="messages")
     room = relationship("ChatRoom", back_populates="messages")
+    read_status = relationship("MessageReadStatus", back_populates="message", cascade="all, delete")
     
 # class Message(Base):
 #     __tablename__ = "messages"

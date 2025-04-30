@@ -631,3 +631,23 @@ async def delete_status(
         await db.commit()
 
     return RedirectResponse(url="/dash/status", status_code=303)
+
+@router_dash.post("/profile/remove-avatar")
+async def remove_avatar(
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    try:
+        result = await db.execute(select(User).where(User.id == current_user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user.avatar_data = None
+        await db.commit()
+        
+        return RedirectResponse(url="/dash/profile", status_code=303)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))

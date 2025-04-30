@@ -7,7 +7,54 @@
     <title>ChatsApp</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
     <link rel="stylesheet" href="/static/dashboard.css">
+    <!-- Добавляем библиотеку Emoji Picker -->
     <style>
+        .message-input-area {
+            position: relative;
+        }
+
+        .message-input {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .icon-left, .icon-right {
+            cursor: pointer;
+        }
+
+        .emoji-popup {
+            position: absolute;
+            background: #2a3e4c;
+            border: 1px solid #4a6b66;
+            padding: 10px;
+            box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            bottom: 50px;
+            left: 0;
+            z-index: 100;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            max-width: 200px;
+        }
+
+        .emoji-popup.hidden {
+            display: none;
+        }
+
+        .emoji {
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+            color: white;
+        }
+
+        .emoji:hover {
+            background-color: #3e5c76;
+        }
         .message-list {
             flex-grow: 1;
             overflow-y: auto;
@@ -99,8 +146,8 @@
         .date-divider {
             text-align: center;
             margin: 10px 0;
-            color: #b0b0b0;
-            font-size: 12px;
+            color: white;
+            font-size: 20px;
             position: relative;
         }
 
@@ -116,8 +163,9 @@
         }
 
         .date-divider span {
-            background: #121212;
-            padding: 0 10px;
+            background: #48926F;
+            border-radius: 10px;
+            padding: 0 20px;
         }
 
         .error {
@@ -188,6 +236,35 @@
         .context-menu-item:hover {
             background-color: #48926F;
         }
+
+        /* Стили для изображений и Emoji Picker */
+        .message-image {
+            max-width: 200px;
+            max-height: 200px;
+            border-radius: 5px;
+            margin-top: 5px;
+        }
+
+        /* emoji-picker {
+            position: absolute;
+            bottom: 60px;
+            left: 20px;
+            z-index: 1000;
+            width: 300px;
+            height: 400px;
+            background-color: #1F392D;
+            border-radius: 5px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        } */
+
+        .message-input {
+            position: relative;
+        }
+
+        .icon-left,
+        .icon-right {
+            cursor: pointer;
+        }
     </style>
 </head>
 
@@ -247,13 +324,13 @@
                     </div>
                     <div class="contact-info">
                         <div class="contact-name">{{ user.username if user else room.name if room else '' }}</div>
-                        <div class="contact-last-msg">
+                        <!-- <div class="contact-last-msg">
                             {% if last_msg_content %}
                             {{ sender_username }}: {{ last_msg_content }}
                             {% else %}
                             —
                             {% endif %}
-                        </div>
+                        </div> -->
                     </div>
                 </div>
                 {% endfor %}
@@ -337,14 +414,30 @@
             </div>
             <div class="message-input-area">
                 <div class="message-input">
-                    <i class="far fa-smile icon-left"></i>
+                    <i class="far fa-smile icon-left" id="emoji-toggle"></i>
                     <input type="text" id="message-input" placeholder="Enter the message">
-                    <i class="fas fa-paperclip icon-right"></i>
+                    <i class="fas fa-paperclip icon-right" id="attach-image"></i>
+                </div>
+                <div id="emoji-popup" class="emoji-popup hidden">
+                    <span class="emoji">😀</span>
+                    <span class="emoji">😁</span>
+                    <span class="emoji">😂</span>
+                    <span class="emoji">🤣</span>
+                    <span class="emoji">😃</span>
+                    <span class="emoji">😄</span>
+                    <span class="emoji">😅</span>
+                    <span class="emoji">😆</span>
+                    <span class="emoji">😉</span>
+                    <span class="emoji">😊</span>
                 </div>
                 <div class="actions">
                     <i class="fas fa-microphone" id="mic-icon" class="active"></i>
                     <i class="fas fa-paper-plane" id="send-icon"></i>
                 </div>
+                <!-- Добавляем скрытый input для загрузки изображений -->
+                <input type="file" id="image-input" accept="image/*" style="display: none;">
+                <!-- Панель Emoji Picker -->
+                <emoji-picker id="emoji-picker" style="display: none;"></emoji-picker>
             </div>
             <div class="message-context-menu" id="message-context-menu">
                 <div class="context-menu-item" id="delete-message">Удалить</div>
@@ -355,10 +448,41 @@
         const input = document.getElementById("message-input");
         const micIcon = document.getElementById("mic-icon");
         const sendIcon = document.getElementById("send-icon");
+        const emojiButton = document.getElementById('emoji-toggle');
+        const emojiPopup = document.getElementById('emoji-popup');
+        const attachImage = document.getElementById("attach-image");
+        const imageInput = document.getElementById("image-input");
         const userId = "{{ request.state.user_id }}";
         let currentRoomId = null;
         let chatSocket = null;
         let lastDate = null;
+
+
+        // Close popup when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!emojiPopup.contains(e.target) && !emojiButton.contains(e.target)) {
+                emojiPopup.classList.add('hidden');
+            }
+        });
+
+        // Обработчик загрузки изображения
+        attachImage.addEventListener('click', () => {
+            imageInput.click();
+        });
+
+        imageInput.addEventListener('change', () => {
+            const file = imageInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => {
+                    const base64Image = reader.result; // base64 строка изображения
+                    sendMessage(currentRoomId, input.value.trim(), base64Image);
+                    input.value = ''; // Очищаем текстовое поле
+                    imageInput.value = ''; // Очищаем input
+                };
+                reader.readAsDataURL(file);
+            }
+        });
 
         // Функция для получения токена
         function getCookie(name) {
@@ -486,10 +610,20 @@
             }
 
             // Текст сообщения
-            const textDiv = document.createElement('div');
-            textDiv.classList.add('message-text');
-            textDiv.textContent = msg.content || msg.message;
-            contentDiv.appendChild(textDiv);
+            if (msg.content) {
+                const textDiv = document.createElement('div');
+                textDiv.classList.add('message-text');
+                textDiv.textContent = msg.content || msg.message;
+                contentDiv.appendChild(textDiv);
+            }
+
+            // Изображение
+            if (msg.image_data) {
+                const imageDiv = document.createElement('img');
+                imageDiv.classList.add('message-image');
+                imageDiv.src = `data:image/png;base64,${msg.image_data}`;
+                contentDiv.appendChild(imageDiv);
+            }
 
             // Время
             const timeDiv = document.createElement('div');
@@ -510,48 +644,59 @@
         }
 
         // Функция для отправки сообщения
-        function sendMessage(roomId, message, token) {
+        function sendMessage(roomId, message, imageData) {
             const socket = new WebSocket(`ws://localhost:8000/ws/send_message/${roomId}`);
             const messageList = document.getElementById('message-list');
             const tempMessageId = 'temp-' + Date.now();
 
             socket.onopen = function () {
-                const payload = {
-                    message: message,
-                    token: token
-                };
-                socket.send(JSON.stringify(payload));
+                getToken().then(token => {
+                    const payload = {
+                        message: message,
+                        image_data: imageData,
+                        token: token
+                    };
+                    console.log("Отправка payload:", payload); // Отладка
+                    socket.send(JSON.stringify(payload));
 
-                // Локально добавляем сообщение
-                const tempMessage = {
-                    message: message,
-                    sender_id: userId,
-                    timestamp: new Date().toISOString(),
-                    message_id: tempMessageId
-                };
-                const messageDate = formatDate(tempMessage.timestamp);
-                if (lastDate !== messageDate) {
-                    const divider = createDateDivider(messageDate);
-                    messageList.appendChild(divider);
-                    lastDate = messageDate;
-                }
-                const messageElement = createMessageElement(tempMessage, true);
-                messageList.appendChild(messageElement);
-                scrollToBottomIfNeeded(messageList);
-
-                document.getElementById('message-input').value = '';
+                    // Локально добавляем сообщение
+                    const tempMessage = {
+                        content: message,
+                        image_data: imageData,
+                        sender_id: userId,
+                        timestamp: new Date().toISOString(),
+                        message_id: tempMessageId
+                    };
+                    const messageDate = formatDate(tempMessage.timestamp);
+                    if (lastDate !== messageDate) {
+                        const divider = createDateDivider(messageDate);
+                        messageList.appendChild(divider);
+                        lastDate = messageDate;
+                    }
+                    const messageElement = createMessageElement(tempMessage, true);
+                    messageList.appendChild(messageElement);
+                    scrollToBottomIfNeeded(messageList);
+                }).catch(error => {
+                    alert(`Ошибка: ${error}`);
+                });
             };
 
             socket.onmessage = function (event) {
                 const data = JSON.parse(event.data);
+                console.log("Получен ответ от сервера:", data); // Отладка
                 if (data.event === "message_sent") {
                     console.log("Сообщение отправлено:", data.message);
-                    // Обновляем временное сообщение
                     const tempMessageElement = messageList.querySelector(`[data-message-id="${tempMessageId}"]`);
                     if (tempMessageElement) {
                         tempMessageElement.setAttribute('data-message-id', data.message_id);
                         const textDiv = tempMessageElement.querySelector('.message-text');
-                        textDiv.textContent = data.message;
+                        if (textDiv && data.message) {
+                            textDiv.textContent = data.message;
+                        }
+                        const imageDiv = tempMessageElement.querySelector('.message-image');
+                        if (imageDiv && data.image_data) {
+                            imageDiv.src = `data:image/png;base64,${data.image_data}`;
+                        }
                         const timeDiv = tempMessageElement.querySelector('.message-time');
                         timeDiv.textContent = new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     }
@@ -633,18 +778,17 @@
             }
             const roomId = contactItem.getAttribute('data-room-id');
             const message = messageInput.value.trim();
+            console.log("Отправка сообщения:", { roomId, message }); // Отладка
             if (!roomId) {
                 alert("Ошибка: ID комнаты не найден!");
                 return;
             }
-            if (!message) {
-                alert("Сообщение не может быть пустым!");
-                return;
-            }
+            // Удаляем проверку на пустое сообщение, так как сервер уже проверяет
             getToken().then(token => {
-                sendMessage(roomId, message, token);
+                sendMessage(roomId, message, null);
+                messageInput.value = ''; // Очищаем поле ввода
             }).catch(error => {
-                alert(error);
+                alert(`Ошибка: ${error}`);
             });
         });
 
@@ -815,7 +959,6 @@
                     });
                     scrollToBottomIfNeeded(messageList);
                 } else if (data.event === "new_message") {
-                    // Это событие больше не будет приходить для других пользователей
                     if (String(data.sender_id) === String(userId) && messageList.querySelector(`[data-message-id="${data.message_id}"]`)) {
                         return;
                     }
@@ -852,6 +995,23 @@
 
         // Обработчики событий для контактов
         document.addEventListener('DOMContentLoaded', async function () {
+            emojiButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                emojiPopup.classList.toggle('hidden');
+                mediaPopup.classList.add('hidden');
+            });
+
+            document.querySelectorAll('.emoji').forEach(emoji => {
+                emoji.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    input.value += emoji.textContent;
+                    emojiPopup.classList.add('hidden');
+                    input.focus();
+                    sendIcon.classList.add("active");
+                    micIcon.classList.remove("active");
+                });
+            });
+
             const chatAreaCon = document.getElementById('chat-area-con');
             const chatArea = document.getElementById('chat-area');
             const chatTitle = document.getElementById('current-chat-title');
@@ -904,6 +1064,12 @@
             });
             if (!selectedContact) {
                 chatArea.style.display = 'none';
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!emojiPopup.contains(e.target) && !emojiButton.contains(e.target)) {
+                emojiPopup.classList.add('hidden');
             }
         });
     </script>

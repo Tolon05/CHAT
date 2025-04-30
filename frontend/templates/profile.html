@@ -25,12 +25,11 @@
                     <div class="avatar">
                         {% if user.avatar_url %}
                         <img src="{{ user.avatar_url }}" alt="Avatar" id="avatar-img">
+                        <button type="button" id="remove-avatar" class="remove-avatar-btn">Remove Avatar</button>
                         {% else %}
                         <img src="/static/avatars/default_avatar.png" alt="Default Avatar" id="avatar-img">
                         {% endif %}
-
                         <label for="avatar-input" class="add-photo-text">Add Profile Photo</label>
-                        <!-- Здесь можно выбрать новый аватар -->
                         <input type="file" id="avatar-input" name="avatar" accept="image/*" hidden>
                     </div>
                 </div>
@@ -122,6 +121,28 @@
                 // Важно: обновляем скрытое поле формы для отправки выбранного файла
                 const avatarFileInput = document.getElementById('avatar-file');
                 avatarFileInput.files = e.target.files;
+            }
+        });
+
+        document.getElementById('remove-avatar')?.addEventListener('click', async function () {
+            if (confirm('Are you sure you want to remove your avatar?')) {
+                try {
+                    const response = await fetch('/dash/profile/remove-avatar', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    } else {
+                        const error = await response.json();
+                        alert('Error: ' + error.detail);
+                    }
+                } catch (error) {
+                    alert('Error removing avatar: ' + error.message);
+                }
             }
         });
     </script>

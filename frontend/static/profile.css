@@ -274,3 +274,18 @@ body {
     z-index: 1;
     /* Убедимся, что текст поверх фона */
 }
+
+.remove-avatar-btn {
+    margin-top: 10px;
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.remove-avatar-btn:hover {
+    background-color: #cc0000;
+}

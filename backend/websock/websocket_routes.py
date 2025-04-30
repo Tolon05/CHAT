@@ -118,11 +118,13 @@ async def chat_endpoint(
         for msg in messages:
             read_by = [status.user_id for status in msg.read_status]
             avatar_data = base64.b64encode(msg.sender.avatar_data).decode('utf-8') if msg.sender.avatar_data else None
+            image_data = base64.b64encode(msg.image_data).decode('utf-8') if msg.image_data else None
             message_history.append({
                 "sender_id": msg.sender_id,
                 "sender_username": msg.sender.username,
                 "avatar_data": avatar_data,
                 "content": msg.content,
+                "image_data": image_data,
                 "timestamp": msg.timestamp.isoformat(),
                 "message_id": msg.id,
                 "read_by": read_by
@@ -152,6 +154,8 @@ async def chat_endpoint(
         await websocket.send_json({"event": "error", "message": "Internal server error"})
         await websocket.close()
 
+import base64
+
 @router_ws.websocket("/ws/send_message/{room_id}")
 async def send_message_to_room(
     websocket: WebSocket,
@@ -166,14 +170,11 @@ async def send_message_to_room(
             data = await websocket.receive_json()
 
             token = data.get("token")
-            message = data.get("message", "")
+            message = data.get("message", "")  # Может быть пустой строкой
+            image_data = data.get("image_data")  # Данные изображения в формате base64
 
             if not token:
                 await websocket.send_json({"event": "error", "message": "Missing token"})
-                continue
-
-            if not message:
-                await websocket.send_json({"event": "error", "message": "Message cannot be empty"})
                 continue
 
             try:
@@ -203,11 +204,22 @@ async def send_message_to_room(
 
             sender_id, sender_username, sender_avatar_data = sender_data
 
+            # Декодируем изображение из base64, если оно есть
+            image_binary = None
+            if image_data:
+                try:
+                    # Удаляем префикс "data:image/..." из base64-строки, если он есть
+                    image_binary = base64.b64decode(image_data.split(",")[1] if "," in image_data else image_data)
+                except Exception as e:
+                    await websocket.send_json({"event": "error", "message": f"Invalid image data: {str(e)}"})
+                    continue
+
             # Сохраняем сообщение
             new_message = Message(
                 sender_id=sender_id,
                 room_id=room_id,
                 content=message,
+                image_data=image_binary,
                 timestamp=datetime.now(timezone.utc)
             )
             db_session.add(new_message)
@@ -233,14 +245,16 @@ async def send_message_to_room(
             participant_ids = result.scalars().all()
             other_participant_ids = [uid for uid in participant_ids if uid != sender_id]
 
-            # Кодируем аватар
+            # Кодируем аватар и изображение для отправки
             avatar_data = base64.b64encode(sender_avatar_data).decode('utf-8') if sender_avatar_data else None
+            image_data_response = base64.b64encode(image_binary).decode('utf-8') if image_binary else None
 
             # Формируем данные сообщения
             message_data = {
                 "event": "new_message",
                 "status": "success",
-                "message": message,
+                "content": message,
+                "image_data": image_data_response,
                 "message_id": message_id,
                 "timestamp": message_timestamp,
                 "sender_username": sender_username,
@@ -265,6 +279,7 @@ async def send_message_to_room(
                 "event": "message_sent",
                 "status": "success",
                 "message": message,
+                "image_data": image_data_response,
                 "message_id": message_id,
                 "timestamp": message_timestamp,
                 "sender_username": sender_username,
