@@ -265,6 +265,59 @@
         .icon-right {
             cursor: pointer;
         }
+
+        .edit-input {
+            background-color: #fff;
+            color: #000;
+            font-size: 14px;
+            outline: none;
+        }
+
+        .message-text.translated {
+            cursor: pointer;
+            font-style: italic;
+        }
+        .message-text.translated:hover {
+            text-decoration: underline;
+        }
+
+
+
+        /* // Add this CSS to your existing <style> block in the HTML */
+            .message.received:hover .translate-icon {
+            display: block;
+            padding: 10px;
+        }
+
+        .translate-icon {
+            display: none;
+            position: absolute;
+            /* right: 600px; */
+            top: 70%;
+            transform: translateY(-50%);
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 5px;
+            background-color: #3e5c76;
+            border-radius: 50%;
+        }
+
+        .translate-icon:hover {
+            background-color: #48926F;
+        }
+
+
+
+
+
+
+
+
+
+
+
+
     </style>
 </head>
 
@@ -351,7 +404,7 @@
                 </div>
                 <div class="nav-item" id="nav-favorites">
                     <div class="nav-circle">
-                        <a href="/favorites"><i class="fas fa-star"></i></a>
+                        <a href="/dash/admin"><i class="fas fa-star"></i></a>
                     </div>
                 </div>
                 <div class="nav-item" id="nav-new">
@@ -441,6 +494,9 @@
             </div>
             <div class="message-context-menu" id="message-context-menu">
                 <div class="context-menu-item" id="delete-message">Удалить</div>
+                <div class="context-menu-item" id="edit-message">Редоктировать</div>
+                <div class="context-menu-item" id="translate-message">Перевести</div>
+
             </div>
         </div>
     </div>
@@ -568,7 +624,7 @@
             return divider;
         }
 
-        // Функция для создания элемента сообщения
+        // Modify the createMessageElement function to add the translation icon for received messages
         function createMessageElement(msg, isSent) {
             const messageDiv = document.createElement('div');
             messageDiv.classList.add('message');
@@ -576,7 +632,7 @@
             messageDiv.setAttribute('data-message-id', msg.message_id || '');
             messageDiv.setAttribute('data-sender-id', msg.sender_id);
 
-            // Аватар
+            // Avatar
             const avatarDiv = document.createElement('div');
             avatarDiv.classList.add('avatar');
             if (msg.avatar_data) {
@@ -597,11 +653,11 @@
             }
             messageDiv.appendChild(avatarDiv);
 
-            // Контент сообщения
+            // Content
             const contentDiv = document.createElement('div');
             contentDiv.classList.add('message-content');
 
-            // Имя отправителя (только для полученных сообщений)
+            // Sender name (for received messages)
             if (!isSent) {
                 const senderDiv = document.createElement('div');
                 senderDiv.classList.add('message-sender');
@@ -609,7 +665,7 @@
                 contentDiv.appendChild(senderDiv);
             }
 
-            // Текст сообщения
+            // Message text
             if (msg.content) {
                 const textDiv = document.createElement('div');
                 textDiv.classList.add('message-text');
@@ -617,7 +673,7 @@
                 contentDiv.appendChild(textDiv);
             }
 
-            // Изображение
+            // Image
             if (msg.image_data) {
                 const imageDiv = document.createElement('img');
                 imageDiv.classList.add('message-image');
@@ -625,13 +681,47 @@
                 contentDiv.appendChild(imageDiv);
             }
 
-            // Время
+            // Time
             const timeDiv = document.createElement('div');
             timeDiv.classList.add('message-time');
             timeDiv.textContent = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             contentDiv.appendChild(timeDiv);
 
             messageDiv.appendChild(contentDiv);
+
+            // Add translation icon for received messages
+            if (!isSent) {
+                const translateIcon = document.createElement('i');
+                translateIcon.classList.add('fas', 'fa-language', 'translate-icon');
+                translateIcon.title = 'Перевести';
+                messageDiv.appendChild(translateIcon);
+
+                // Event listener for translation icon click
+                translateIcon.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    console.log("✏️ Translation icon clicked, messageId:", msg.message_id);
+                    try {
+                        const translatedText = await translateText(msg.message_id, 'en', 'RU');
+                        console.log("✏️ Translation received:", translatedText);
+                        const translationDiv = document.createElement('div');
+                        translationDiv.classList.add('message-text', 'translated');
+                        translationDiv.textContent = translatedText;
+                        translationDiv.style.backgroundColor = '#3e5c76';
+                        translationDiv.style.marginTop = '5px';
+                        translationDiv.style.padding = '5px';
+                        translationDiv.style.borderRadius = '5px';
+                        contentDiv.appendChild(translationDiv);
+                        translationDiv.addEventListener('click', () => {
+                            console.log("✏️ Translation div removed for messageId:", msg.message_id);
+                            translationDiv.remove();
+                        });
+                    } catch (error) {
+                        console.error("✏️ Translation error:", error);
+                        alert(`Ошибка перевода: ${error}`);
+                    }
+                });
+            }
+
             return messageDiv;
         }
 
@@ -942,56 +1032,78 @@
                 });
             };
             chatSocket.onmessage = function (event) {
-                const data = JSON.parse(event.data);
-                if (data.event === "message_history") {
-                    messageList.innerHTML = '';
-                    lastDate = null;
-                    data.messages.forEach(msg => {
-                        const isSent = String(msg.sender_id) === String(userId);
-                        const messageDate = formatDate(msg.timestamp);
-                        if (lastDate !== messageDate) {
-                            const divider = createDateDivider(messageDate);
-                            messageList.appendChild(divider);
-                            lastDate = messageDate;
-                        }
-                        const messageElement = createMessageElement(msg, isSent);
-                        messageList.appendChild(messageElement);
-                    });
-                    scrollToBottomIfNeeded(messageList);
-                } else if (data.event === "new_message") {
-                    if (String(data.sender_id) === String(userId) && messageList.querySelector(`[data-message-id="${data.message_id}"]`)) {
-                        return;
-                    }
-                    const isSent = String(data.sender_id) === String(userId);
-                    const messageDate = formatDate(data.timestamp);
+            const data = JSON.parse(event.data);
+            if (data.event === "message_history") {
+                messageList.innerHTML = '';
+                lastDate = null;
+                // Сортируем сообщения по timestamp для надежности
+                data.messages.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                data.messages.forEach(msg => {
+                    const isSent = String(msg.sender_id) === String(userId);
+                    const messageDate = formatDate(msg.timestamp);
                     if (lastDate !== messageDate) {
                         const divider = createDateDivider(messageDate);
                         messageList.appendChild(divider);
                         lastDate = messageDate;
                     }
-                    const messageElement = createMessageElement(data, isSent);
+                    const messageElement = createMessageElement(msg, isSent);
                     messageList.appendChild(messageElement);
-                    scrollToBottomIfNeeded(messageList);
-                } else if (data.event === "message_deleted") {
-                    const messageElement = messageList.querySelector(`[data-message-id="${data.message_id}"]`);
-                    if (messageElement) {
-                        messageElement.remove();
-                    }
-                } else if (data.event === "chat_cleared") {
-                    messageList.innerHTML = '<div class="loading">Чат очищен</div>';
-                    lastDate = null;
-                } else if (data.event === "error") {
-                    messageList.innerHTML = `<div class="error">${data.message}</div>`;
+                });
+                scrollToBottomIfNeeded(messageList);
+            } else if (data.event === "new_message") {
+                if (String(data.sender_id) === String(userId) && messageList.querySelector(`[data-message-id="${data.message_id}"]`)) {
+                    return;
                 }
-            };
-            chatSocket.onclose = function () {
-                console.log("WebSocket для чата закрыт");
-            };
-            chatSocket.onerror = function (error) {
-                console.error("Ошибка WebSocket для чата:", error);
-                messageList.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
-            };
-        }
+                const isSent = String(data.sender_id) === String(userId);
+                const messageDate = formatDate(data.timestamp);
+                if (lastDate !== messageDate) {
+                    const divider = createDateDivider(messageDate);
+                    messageList.appendChild(divider);
+                    lastDate = messageDate;
+                }
+                const messageElement = createMessageElement(data, isSent);
+                messageList.appendChild(messageElement);
+                scrollToBottomIfNeeded(messageList);
+            } else if (data.event === "message_edited") {
+                const messageElement = messageList.querySelector(`[data-message-id="${data.message_id}"]`);
+                if (messageElement) {
+                    const textDiv = messageElement.querySelector('.message-text');
+                    if (textDiv) {
+                        textDiv.textContent = data.new_content + (data.edited ? " (ред.)" : "");
+                    }
+                    const timeDiv = messageElement.querySelector('.message-time');
+                    if (timeDiv) {
+                        timeDiv.textContent = new Date(data.timestamp).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    }
+                    console.log("✏️ UI updated for edited messageId:", data.message_id);
+                } else {
+                    console.error("✏️ Edited message element not found for messageId:", data.message_id);
+                }
+            } else if (data.event === "message_deleted") {
+                const messageElement = messageList.querySelector(`[data-message-id="${data.message_id}"]`);
+                if (messageElement) {
+                    messageElement.remove();
+                }
+            } else if (data.event === "chat_cleared") {
+                messageList.innerHTML = '<div class="loading">Чат очищен</div>';
+                lastDate = null;
+            } else if (data.event === "error") {
+                messageList.innerHTML = `<div class="error">${data.message}</div>`;
+            }
+        };
+
+        chatSocket.onclose = function () {
+            console.log("WebSocket для чата закрыт");
+        };
+
+        chatSocket.onerror = function (error) {
+            console.error("Ошибка WebSocket для чата:", error);
+            messageList.innerHTML = '<div class="error">Ошибка загрузки сообщений</div>';
+        };
+        };
 
         // Обработчики событий для контактов
         document.addEventListener('DOMContentLoaded', async function () {
@@ -1072,6 +1184,340 @@
                 emojiPopup.classList.add('hidden');
             }
         });
+
+
+
+
+
+// Обработчик для выбора опции "Редактировать" в контекстном меню
+document.getElementById('edit-message').addEventListener('click', function (e) {
+    e.stopPropagation();
+    console.log("✏️ Edit message option clicked");
+    const contactItem = document.querySelector('.contact-item.selected');
+    if (!contactItem) {
+        console.error("✏️ No selected chat");
+        alert("Выберите чат!");
+        return;
+    }
+    const roomId = contactItem.getAttribute('data-room-id');
+    if (!roomId) {
+        console.error("✏️ Room ID not found");
+        alert("Ошибка: ID комнаты не найден!");
+        return;
+    }
+
+    const messageElement = document.querySelector(`[data-message-id="${currentMessageId}"]`);
+    if (!messageElement) {
+        console.error("✏️ Message element not found for messageId:", currentMessageId);
+        alert("Сообщение не найдено!");
+        return;
+    }
+    const textDiv = messageElement.querySelector('.message-text');
+    if (!textDiv) {
+        console.error("✏️ Message has no text content");
+        alert("Сообщение не содержит текста для редактирования!");
+        return;
+    }
+
+    console.log("✏️ Starting edit process for messageId:", currentMessageId, "roomId:", roomId);
+
+    // Создаем контейнер для поля ввода и кнопок
+    const editContainer = document.createElement('div');
+    editContainer.style.display = 'flex';
+    editContainer.style.alignItems = 'center';
+    editContainer.style.gap = '5px';
+
+    // Создаем поле ввода
+    const currentText = textDiv.textContent.replace(" (ред.)", "");
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.classList.add('edit-input');
+    input.style.width = '100%';
+    input.style.padding = '5px';
+    input.style.borderRadius = '5px';
+    input.style.border = '1px solid #ccc';
+
+    // Создаем кнопку "Сохранить"
+    const saveButton = document.createElement('button');
+    saveButton.textContent = 'Сохранить';
+    saveButton.style.padding = '5px 10px';
+    saveButton.style.borderRadius = '5px';
+    saveButton.style.border = '1px solid #ccc';
+    saveButton.style.background = '#4CAF50';
+    saveButton.style.color = 'white';
+    saveButton.style.cursor = 'pointer';
+
+    // Создаем кнопку "Отмена"
+    const cancelButton = document.createElement('button');
+    cancelButton.textContent = 'Отмена';
+    cancelButton.style.padding = '5px 10px';
+    cancelButton.style.borderRadius = '5px';
+    cancelButton.style.border = '1px solid #ccc';
+    cancelButton.style.background = '#f44336';
+    cancelButton.style.color = 'white';
+    cancelButton.style.cursor = 'pointer';
+
+    // Добавляем элементы в контейнер
+    editContainer.appendChild(input);
+    editContainer.appendChild(saveButton);
+    editContainer.appendChild(cancelButton);
+
+    // Заменяем текст на контейнер
+    textDiv.replaceWith(editContainer);
+    input.focus();
+
+    // Функция для сохранения изменений
+    const saveChanges = () => {
+        const newText = input.value.trim();
+        if (newText === '') {
+            console.error("✏️ Empty message content");
+            alert("Сообщение не может быть пустым!");
+            return;
+        }
+        getToken().then(token => {
+            console.log("✏️ Token received, sending edit request:", {
+                roomId,
+                messageId: currentMessageId,
+                newText,
+                token: token.substring(0, 10) + "..."
+            });
+            // Временное обновление UI для отправителя
+            const messageElement = document.querySelector(`[data-message-id="${currentMessageId}"]`);
+            if (messageElement && editContainer.parentElement) {
+                const textDiv = document.createElement('div');
+                textDiv.classList.add('message-text');
+                textDiv.textContent = newText + "   (ред.)"; // Добавляем "(ред.)" для визуального обновления
+                editContainer.replaceWith(textDiv);
+                console.log("✏️ Temporary UI update for messageId:", currentMessageId);
+            }
+            editMessage(roomId, currentMessageId, newText, token, editContainer);
+            contextMenu.classList.remove('active');
+        }).catch(error => {
+            console.error("✏️ Token error:", error);
+            alert(`Ошибка: ${error}`);
+        });
+    };
+
+    // Обработчик для Enter
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            console.log("✏️ Enter pressed, saving changes");
+            saveChanges();
+        } else if (e.key === 'Escape') {
+            console.log("✏️ Edit cancelled via Escape");
+            editContainer.replaceWith(textDiv);
+        }
+    });
+
+    // Обработчик для кнопки "Сохранить"
+    saveButton.addEventListener('click', function (e) {
+        e.stopPropagation();
+        console.log("✏️ Save button clicked, saving changes");
+        saveChanges();
+    });
+
+    // Обработчик для кнопки "Отмена"
+    cancelButton.addEventListener('click', function (e) {
+        e.stopPropagation();
+        console.log("✏️ Edit cancelled via Cancel button");
+        editContainer.replaceWith(textDiv);
+    });
+
+    // Закрытие при клике вне контейнера
+    setTimeout(() => {
+        document.addEventListener('click', function closeEdit(e) {
+            if (!editContainer.contains(e.target)) {
+                console.log("✏️ Edit closed by clicking outside");
+                editContainer.replaceWith(textDiv);
+                document.removeEventListener('click', closeEdit);
+            }
+        });
+    }, 0);
+});
+
+// Функция для отправки отредактированного сообщения
+function editMessage(roomId, messageId, newText, token, editContainer) {
+    console.log("✏️ Connecting to WebSocket for editing", { roomId, messageId, newText });
+    const socket = new WebSocket(`ws://localhost:8000/ws/edit_message/${roomId}/${messageId}`);
+
+    socket.onopen = function () {
+        console.log("✏️ WebSocket opened for editing");
+        socket.send(JSON.stringify({ token: token, new_content: newText }));
+    };
+
+    socket.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        console.log("✏️ WebSocket message received:", data);
+        if (data.event === "message_edited") {
+            console.log("✏️ Message edited successfully:", data.message_id);
+            const messageElement = document.querySelector(`[data-message-id="${data.message_id}"]`);
+            if (messageElement) {
+                const textDiv = document.createElement('div');
+                textDiv.classList.add('message-text');
+                textDiv.textContent = data.new_content + (data.edited ? " (ред.)" : "");
+                if (editContainer && editContainer.parentElement) {
+                    editContainer.replaceWith(textDiv);
+                } else {
+                    const oldTextDiv = messageElement.querySelector('.message-text');
+                    if (oldTextDiv) {
+                        oldTextDiv.replaceWith(textDiv);
+                    }
+                }
+                const timeDiv = messageElement.querySelector('.message-time');
+                timeDiv.textContent = new Date(data.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+                console.log("✏️ UI updated for messageId:", data.message_id);
+            } else {
+                console.error("✏️ Message element not found for messageId:", data.message_id);
+            }
+        } else if (data.event === "error") {
+            console.error("✏️ Server error:", data.message);
+            alert(`Ошибка: ${data.message}`);
+        }
+    };
+
+    socket.onclose = function () {
+        console.log("✏️ WebSocket closed for editing");
+    };
+
+    socket.onerror = function (error) {
+        console.error("✏️ WebSocket error:", error);
+        alert("Ошибка соединения!");
+    };
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        // Обработчик для перевода сообщения
+document.getElementById('translate-message').addEventListener('click', async function (e) {
+    e.stopPropagation();
+    console.log("✏️ Translate message option clicked, messageId:", currentMessageId);
+    const messageElement = document.querySelector(`[data-message-id="${currentMessageId}"]`);
+    if (!messageElement) {
+        console.error("✏️ Message element not found for messageId:", currentMessageId);
+        alert("Сообщение не найдено!");
+        return;
+    }
+    const textDiv = messageElement.querySelector('.message-text');
+    if (!textDiv) {
+        console.error("✏️ Message has no text content");
+        alert("Сообщение не содержит текста для перевода!");
+        return;
+    }
+
+    try {
+        const translatedText = await translateText(currentMessageId, 'en', 'RU');
+        console.log("✏️ Translation received:", translatedText);
+        const translationDiv = document.createElement('div');
+        translationDiv.classList.add('message-text', 'translated');
+        translationDiv.textContent = translatedText;
+        translationDiv.style.backgroundColor = '#3e5c76';
+        translationDiv.style.marginTop = '5px';
+        translationDiv.style.padding = '5px';
+        translationDiv.style.borderRadius = '5px';
+        textDiv.insertAdjacentElement('afterend', translationDiv);
+        translationDiv.addEventListener('click', () => {
+            console.log("✏️ Translation div removed for messageId:", currentMessageId);
+            translationDiv.remove();
+        });
+        contextMenu.classList.remove('active');
+    } catch (error) {
+        console.error("✏️ Translation error:", error);
+        alert(`Ошибка перевода: ${error}`);
+    }
+});
+
+// Функция для вызова API перевода
+async function translateText(messageId, sourceLang, targetLang) {
+    console.log("✏️ Initiating translation for messageId:", messageId, "targetLang:", targetLang);
+    return new Promise((resolve, reject) => {
+        const socket = new WebSocket(`ws://localhost:8000/ws/translate_message/${messageId}`);
+        socket.onopen = function () {
+            console.log("✏️ WebSocket opened for translation");
+            getToken().then(token => {
+                socket.send(JSON.stringify({ token: token, target_lang: targetLang }));
+                console.log("✏️ Translation request sent, token:", token.substring(0, 10) + "...");
+            }).catch(error => {
+                console.error("✏️ Token error:", error);
+                reject(`Ошибка получения токена: ${error}`);
+            });
+        };
+        socket.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+            console.log("✏️ WebSocket message received:", data);
+            if (data.event === "message_translated") {
+                resolve(data.translated_text);
+            } else if (data.event === "error") {
+                reject(`Ошибка: ${data.message}`);
+            }
+            socket.close();
+        };
+        socket.onerror = function (error) {
+            console.error("✏️ WebSocket error:", error);
+            reject(`Ошибка WebSocket: ${error}`);
+            socket.close();
+        };
+        socket.onclose = function () {
+            console.log("✏️ WebSocket closed for translation");
+        };
+    });
+}
+        
+     // Update the context menu handler to allow translation for all messages
+    document.getElementById('message-list').addEventListener('contextmenu', function (e) {
+        e.preventDefault();
+        const messageElement = e.target.closest('.message acclaim: .message');
+        if (messageElement) {
+            currentMessageId = messageElement.getAttribute('data-message-id');
+            if (currentMessageId.startsWith('temp-')) {
+                return; // Ignore temporary messages
+            }
+            const isSent = messageElement.classList.contains('sent') && messageElement.getAttribute('data-sender-id') === userId;
+            const contextMenu = document.getElementById('message-context-menu');
+            const deleteItem = document.getElementById('delete-message');
+            const editItem = document.getElementById('edit-message');
+            const translateItem = document.getElementById('translate-message');
+
+            // Show/hide menu items based on whether the message is sent or received
+            deleteItem.style.display = isSent ? 'block' : 'none';
+            editItem.style.display = isSent ? 'block' : 'none';
+            translateItem.style.display = 'block'; // Always show translate option
+
+            contextMenu.style.top = `${e.clientY}px`;
+            contextMenu.style.left = `${e.clientX}px`;
+            contextMenu.classList.add('active');
+        }
+    });   
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     </script>
 </body>
 

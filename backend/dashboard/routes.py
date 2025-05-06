@@ -10,7 +10,7 @@ from sqlalchemy import or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased
 from backend.database import get_db
-from backend.models.models import User, Contact, ChatRoom, RoomParticipant, Message, GroupSettings, GroupRole
+from backend.models.models import User, Contact, ChatRoom, RoomParticipant, Message, GroupSettings, GroupRole, UserKey
 from backend.auth.token_utils import verify_access_token_for_user_id
 from sqlalchemy import or_, and_
 from sqlalchemy.sql import exists
@@ -37,6 +37,8 @@ templates.env.filters['b64encode'] = b64encode_filter
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql import select, and_, or_, exists
 from fastapi import HTTPException, Query
+from sqlalchemy.orm import joinedload
+from sqlalchemy import delete
 
 router_dash = APIRouter()
 
@@ -651,3 +653,234 @@ async def remove_avatar(
     except Exception as e:
         await db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
+    
+
+
+
+
+
+@router_dash.get("/admin", response_class=HTMLResponse)
+async def admin_panel(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    # Check if user is admin (username == "aman")
+    user_result = await db.execute(select(User).where(User.id == current_user_id))
+    user = user_result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.username.lower() != "aman":
+        raise HTTPException(status_code=403, detail="Access denied: Admin only")
+
+    # Count private chats and groups
+    private_chats_count = await db.execute(
+        select(ChatRoom).where(ChatRoom.type == "private")
+    )
+    private_chats_count = len(private_chats_count.scalars().all())
+
+    groups_count = await db.execute(
+        select(ChatRoom).where(ChatRoom.type == "group")
+    )
+    groups_count = len(groups_count.scalars().all())
+
+    # Fetch all users
+    users_result = await db.execute(select(User))
+    users = users_result.scalars().all()
+    users_data = [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "avatar_url": f"data:image/png;base64,{b64encode(u.avatar_data).decode('utf-8')}" if u.avatar_data else None
+        }
+        for u in users
+    ]
+
+    # Fetch all chats with participants eagerly loaded
+    chats_result = await db.execute(
+        select(ChatRoom).options(joinedload(ChatRoom.participants))
+    )
+    chats = chats_result.scalars().unique().all()
+    chats_data = [
+        {
+            "id": c.id,
+            "name": c.name or f"Private Chat {c.id}",
+            "type": c.type,
+            "participant_count": len(c.participants)
+        }
+        for c in chats
+    ]
+
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "private_chats_count": private_chats_count,
+            "groups_count": groups_count,
+            "users": users_data,
+            "chats": chats_data,
+            "selected_chat": None,
+            "messages": []
+        }
+    )
+
+@router_dash.get("/admin/view_chat/{chat_id}", response_class=HTMLResponse)
+async def view_chat(
+    chat_id: int,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    # Check admin
+    user_result = await db.execute(select(User).where(User.id == current_user_id))
+    user = user_result.scalar_one_or_none()
+    if not user or user.username.lower() != "aman":
+        raise HTTPException(status_code=403, detail="Access denied: Admin only")
+
+    # Count chats
+    private_chats_count = await db.execute(
+        select(ChatRoom).where(ChatRoom.type == "private")
+    )
+    private_chats_count = len(private_chats_count.scalars().all())
+
+    groups_count = await db.execute(
+        select(ChatRoom).where(ChatRoom.type == "group")
+    )
+    groups_count = len(groups_count.scalars().all())
+
+    # Fetch users
+    users_result = await db.execute(select(User))
+    users = users_result.scalars().all()
+    users_data = [
+        {
+            "id": u.id,
+            "username": u.username,
+            "email": u.email,
+            "avatar_url": f"data:image/png;base64,{b64encode(u.avatar_data).decode('utf-8')}" if u.avatar_data else None
+        }
+        for u in users
+    ]
+
+    # Fetch all chats with participants eagerly loaded
+    chats_result = await db.execute(
+        select(ChatRoom).options(joinedload(ChatRoom.participants))
+    )
+    chats = chats_result.scalars().unique().all()
+    chats_data = [
+        {
+            "id": c.id,
+            "name": c.name or f"Private Chat {c.id}",
+            "type": c.type,
+            "participant_count": len(c.participants)
+        }
+        for c in chats
+    ]
+
+    # Fetch selected chat
+    chat_result = await db.execute(select(ChatRoom).where(ChatRoom.id == chat_id))
+    selected_chat = chat_result.scalar_one_or_none()
+    if not selected_chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    # Fetch messages in chat
+    messages_result = await db.execute(
+        select(Message, User.username)
+        .join(User, User.id == Message.sender_id)
+        .where(Message.room_id == chat_id)
+        .order_by(Message.timestamp.asc())
+    )
+    messages = [
+        {
+            "sender": row.username,
+            "content": row.Message.content,
+            "timestamp": row.Message.timestamp,
+            "image": f"data:image/png;base64,{b64encode(row.Message.image_data).decode('utf-8')}" if row.Message.image_data else None
+        }
+        for row in messages_result.all()
+    ]
+
+    return templates.TemplateResponse(
+        "admin.html",
+        {
+            "request": request,
+            "private_chats_count": private_chats_count,
+            "groups_count": groups_count,
+            "users": users_data,
+            "chats": chats_data,
+            "selected_chat": {
+                "id": selected_chat.id,
+                "name": selected_chat.name or f"Private Chat {selected_chat.id}",
+                "type": selected_chat.type
+            },
+            "messages": messages
+        }
+    )
+
+@router_dash.post("/admin/delete_user/{user_id}")
+async def delete_user(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    # Check if user is admin
+    user_result = await db.execute(select(User).where(User.id == current_user_id))
+    user = user_result.scalar_one_or_none()
+    if not user or user.username.lower() != "aman":
+        raise HTTPException(status_code=403, detail="Access denied: Admin only")
+
+    # Prevent self-deletion
+    if user_id == current_user_id:
+        raise HTTPException(status_code=400, detail="Cannot delete yourself")
+
+    # Find user
+    target_user_result = await db.execute(select(User).where(User.id == user_id))
+    target_user = target_user_result.scalar_one_or_none()
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    try:
+        # Explicitly delete UserKey record for this user
+        await db.execute(
+            delete(UserKey).where(UserKey.user_id == user_id)
+        )
+
+        # Delete the user (cascading deletes will handle other related records)
+        await db.delete(target_user)
+        await db.commit()
+        return RedirectResponse(url="/dash/admin", status_code=303)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete user: {str(e)}")
+
+@router_dash.post("/admin/delete_chat/{chat_id}")
+async def delete_chat(
+    chat_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(verify_access_token_for_user_id)
+):
+    # Check if user is admin
+    user_result = await db.execute(select(User).where(User.id == current_user_id))
+    user = user_result.scalar_one_or_none()
+    if not user or user.username.lower() != "aman":
+        raise HTTPException(status_code=403, detail="Access denied: Admin only")
+
+    # Find chat
+    chat_result = await db.execute(select(ChatRoom).where(ChatRoom.id == chat_id))
+    chat = chat_result.scalar_one_or_none()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    try:
+        # Explicitly delete GroupRole records for this chat
+        await db.execute(
+            delete(GroupRole).where(GroupRole.room_id == chat_id)
+        )
+
+        # Delete the chat (cascading deletes will handle messages, participants, group_settings)
+        await db.delete(chat)
+        await db.commit()
+        return RedirectResponse(url="/dash/admin", status_code=303)
+    except Exception as e:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete chat: {str(e)}")

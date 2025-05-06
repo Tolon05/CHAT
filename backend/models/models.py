@@ -114,6 +114,7 @@ class Message(Base):
     content = Column(String, nullable=True)  # Текст или смайлики
     image_data = Column(LargeBinary, nullable=True)  # Бинарные данные изображения
     timestamp = Column(DateTime, default=datetime.now(timezone.utc), index=True)
+    edited = Column(Boolean, default=False)  # Новое поле
 
     sender = relationship("User", back_populates="messages")
     room = relationship("ChatRoom", back_populates="messages")

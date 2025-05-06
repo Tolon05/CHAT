@@ -1,13 +1,66 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
 from fastapi.responses import JSONResponse
 from typing import Dict
-from backend.models.models import Message, RoomParticipant, MessageReadStatus, ChatRoom as Room
+from backend.models.models import Message, RoomParticipant, MessageReadStatus, ChatRoom as Room , User
 from backend.database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.auth.token_utils import verify_access_token_for_user_id, verify_access_token_for_user_id_ws
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone
+import aiohttp
+import logging
+import httpx
+from typing import Optional
+
+
+
+# Настройка DeepL API (замените YOUR_DEEPL_API_KEY на ваш ключ)
+DEEPL_API_KEY = "49af81f2-80ff-421a-9a44-03c96a663098:fx"  # Получите ключ на https://www.deepl.com/pro-api
+DEEPL_API_URL = "https://api-free.deepl.com/v2/translate"
+
+
+
+# Настройка логгера
+# Очищаем существующие обработчики корневого логгера, чтобы избежать дублирования
+logging.getLogger('').handlers.clear()
+
+# Настройка логгера
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s,%(msecs)03d %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[
+        logging.StreamHandler()  # Вывод только в консоль
+    ]
+)
+
+# Настройка логгера SQLAlchemy
+sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
+sqlalchemy_logger.setLevel(logging.INFO)
+sqlalchemy_logger.propagate = False  # Отключаем пропагацию к корневому логгеру
+
+# Логгер для вашего приложения
+logger = logging.getLogger(__name__)
+
+
+
+
+logging.getLogger('').handlers.clear()
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s,%(msecs)03d %(levelname)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+sqlalchemy_logger = logging.getLogger('sqlalchemy.engine')
+sqlalchemy_logger.setLevel(logging.INFO)
+sqlalchemy_logger.propagate = False
+
+
+
 
 router_ws = APIRouter()
 
@@ -361,6 +414,7 @@ from sqlalchemy import select, delete
 from sqlalchemy.orm import selectinload
 from datetime import datetime, timezone
 import base64
+from backend.models.models import Message, RoomParticipant, MessageReadStatus, ChatRoom as Room, User
 
 @router_ws.websocket("/ws/delete_message/{room_id}/{message_id}")
 async def delete_message(
@@ -518,3 +572,261 @@ async def clear_chat(
         await websocket.close()
 
     return JSONResponse(status_code=200, content={"message": "Chat cleared successfully"})
+
+
+
+
+@router_ws.websocket("/ws/edit_message/{room_id}/{message_id}")
+async def edit_message(
+    websocket: WebSocket,
+    room_id: int,
+    message_id: int,
+    db_session: AsyncSession = Depends(get_db)
+):
+    logger.info(f"✏️ WebSocket connection attempt for /ws/edit_message/{room_id}/{message_id}")
+    await websocket.accept()
+    user_id = None
+
+    try:
+        # Получаем токен и новый текст
+        data = await websocket.receive_json()
+        token = data.get("token")
+        new_content = data.get("new_content")
+
+        logger.info(f"✏️ Received data: token={token[:10]}..., new_content_length={len(new_content) if new_content else 0}")
+
+        if not token:
+            logger.warning("✏️ Missing token in request")
+            await websocket.send_json({"event": "error", "message": "Missing token"})
+            await websocket.close()
+            return
+
+        if not new_content:
+            logger.warning("✏️ New content is empty")
+            await websocket.send_json({"event": "error", "message": "New content cannot be empty"})
+            await websocket.close()
+            return
+
+        if len(new_content) > 5000:
+            logger.warning(f"✏️ New content too long: {len(new_content)} characters")
+            await websocket.send_json({"event": "error", "message": "New content too long (max 5000 characters)"})
+            await websocket.close()
+            return
+
+        # Проверка токена
+        logger.info("✏️ Verifying token")
+        try:
+            user_id = await verify_access_token_for_user_id_ws(token)
+            logger.info(f"✏️ Token verified, user_id={user_id}")
+        except Exception as e:
+            logger.error(f"✏️ Invalid token: {str(e)}")
+            await websocket.send_json({"event": "error", "message": f"Invalid token: {str(e)}"})
+            await websocket.close()
+            return
+
+        # Проверяем сообщение
+        logger.info(f"✏️ Fetching message id={message_id} in room_id={room_id}")
+        result = await db_session.execute(
+            select(Message).filter_by(id=message_id, room_id=room_id)
+        )
+        message = result.scalar_one_or_none()
+
+        if not message:
+            logger.warning(f"✏️ Message id={message_id} not found in room_id={room_id}")
+            await websocket.send_json({"event": "error", "message": "Message not found"})
+            await websocket.close()
+            return
+
+        # Проверяем, является ли пользователь отправителем
+        if message.sender_id != user_id:
+            logger.warning(f"✏️ User id={user_id} attempted to edit message id={message_id} owned by sender_id={message.sender_id}")
+            await websocket.send_json({"event": "error", "message": "You can only edit your own messages"})
+            await websocket.close()
+            return
+
+        # Обновляем сообщение
+        logger.info(f"✏️ Updating message id={message_id} with new content")
+        message.content = new_content
+        message.edited = True
+        await db_session.commit()
+        logger.info(f"✏️ Message id={message_id} updated successfully")
+
+        # Уведомляем всех участников комнаты
+        message_data = {
+            "event": "message_edited",
+            "message_id": message_id,
+            "room_id": room_id,
+            "new_content": new_content,
+            "timestamp": message.timestamp.isoformat(),
+            "edited": message.edited
+        }
+        logger.info(f"✏️ Connected users: {list(connected_users.keys())}")
+        for uid, ws in connected_users.items():
+            try:
+                await ws.send_json(message_data)
+                logger.info(f"✏️ Edit notification sent to user {uid} in room {room_id}")
+            except Exception as e:
+                logger.error(f"✏️ Error notifying user {uid} in room {room_id}: {e}")
+
+        # Подтверждаем отправителю
+        await websocket.send_json({
+            "event": "message_edited",
+            "status": "success",
+            "message_id": message_id,
+            "new_content": new_content,
+            "timestamp": message.timestamp.isoformat(),
+            "edited": message.edited
+        })
+        logger.info(f"✏️ Edit confirmation sent to sender id={user_id}")
+
+    except WebSocketDisconnect:
+        logger.info(f"✏️ User {user_id} disconnected from edit_message")
+
+    except Exception as e:
+        logger.error(f"✏️ Unexpected error in edit_message: {str(e)}")
+        # await websocket.send_json({"event": "error", "message": f"Internal server error: {str(e)}"})
+
+    finally:
+        try:
+            await websocket.close()
+        except RuntimeError:
+            logger.info("✏️ WebSocket already closed, skipping close attempt")
+
+
+
+
+
+
+
+
+
+
+async def translate_text_deepl(text: str, source_lang: str = "EN", target_lang: str = "RU") -> Optional[str]:
+    """
+    Переводит текст с использованием DeepL API.
+    """
+    async with httpx.AsyncClient() as client:
+        try:
+            logger.info(f"✏️ Sending DeepL request: text='{text}', source_lang={source_lang}, target_lang={target_lang}")
+            response = await client.post(
+                DEEPL_API_URL,
+                headers={
+                    "Authorization": f"DeepL-Auth-Key {DEEPL_API_KEY}",
+                    "Content-Type": "application/x-www-form-urlencoded"
+                },
+                data={
+                    "text": text,
+                    "source_lang": source_lang,
+                    "target_lang": target_lang
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            logger.info(f"✏️ DeepL response: {result}")
+            return result["translations"][0]["text"]
+        except httpx.HTTPStatusError as e:
+            logger.error(f"✏️ DeepL HTTP error: {e.response.status_code} {e.response.reason_phrase}")
+            logger.error(f"✏️ DeepL response text: {e.response.text}")
+            return None
+        except Exception as e:
+            logger.error(f"✏️ DeepL translation error: {str(e)}")
+            return None
+
+@router_ws.websocket("/ws/translate_message/{message_id}")
+async def translate_message(
+    websocket: WebSocket,
+    message_id: int,
+    db_session: AsyncSession = Depends(get_db)
+):
+    logger.info(f"✏️ WebSocket connection attempt for /ws/translate_message/{message_id}")
+    await websocket.accept()
+    user_id = None
+
+    try:
+        # Получаем токен и целевой язык
+        data = await websocket.receive_json()
+        token = data.get("token")
+        target_lang = data.get("target_lang", "RU")  # По умолчанию русский
+
+        logger.info(f"✏️ Received data: token={token[:10]}..., target_lang={target_lang}")
+
+        if not token:
+            logger.warning("✏️ Missing token in request")
+            await websocket.send_json({"event": "error", "message": "Missing token"})
+            await websocket.close()
+            return
+
+        # Приводим target_lang к верхнему регистру для единообразия
+        target_lang = target_lang.upper()
+        if target_lang not in ["RU"]:  # Ограничиваем целевой язык
+            logger.warning(f"✏️ Unsupported target language: {target_lang}")
+            await websocket.send_json({"event": "error", "message": f"Unsupported target language: {target_lang}"})
+            await websocket.close()
+            return
+
+        # Проверка токена
+        logger.info("✏️ Verifying token")
+        try:
+            user_id = await verify_access_token_for_user_id_ws(token)
+            logger.info(f"✏️ Token verified, user_id={user_id}")
+        except Exception as e:
+            logger.error(f"✏️ Invalid token: {str(e)}")
+            await websocket.send_json({"event": "error", "message": f"Invalid token: {str(e)}"})
+            await websocket.close()
+            return
+
+        # Проверяем сообщение
+        logger.info(f"✏️ Fetching message id={message_id}")
+        result = await db_session.execute(
+            select(Message).filter_by(id=message_id)
+        )
+        message = result.scalar_one_or_none()
+
+        if not message:
+            logger.warning(f"✏️ Message id={message_id} not found")
+            await websocket.send_json({"event": "error", "message": "Message not found"})
+            await websocket.close()
+            return
+
+        # Проверяем, является ли пользователь участником комнаты
+        logger.info(f"✏️ Checking room membership for user {user_id} in room {message.room_id}")
+        result = await db_session.execute(
+            select(RoomParticipant).filter_by(room_id=message.room_id, user_id=user_id)
+        )
+        if not result.scalar_one_or_none():
+            logger.warning(f"✏️ User {user_id} is not a member of room {message.room_id}")
+            await websocket.send_json({"event": "error", "message": "Not a member of this room"})
+            await websocket.close()
+            return
+
+        # Переводим текст
+        logger.info(f"✏️ Translating message id={message_id} with content: {message.content}")
+        translated_text = await translate_text_deepl(message.content, source_lang="EN", target_lang=target_lang)
+        if translated_text is None:
+            logger.error(f"✏️ Translation failed for message id={message_id}")
+            await websocket.send_json({"event": "error", "message": "Translation failed"})
+            await websocket.close()
+            return
+
+        logger.info(f"✏️ Message id={message_id} translated successfully to: {translated_text}")
+        # Отправляем переведенный текст клиенту
+        await websocket.send_json({
+            "event": "message_translated",
+            "message_id": message_id,
+            "translated_text": translated_text,
+            "target_lang": target_lang
+        })
+        logger.info(f"✏️ Translation sent to user id={user_id}")
+
+    except WebSocketDisconnect:
+        logger.info(f"✏️ User {user_id} disconnected from translate_message")
+
+    except Exception as e:
+        logger.error(f"✏️ Unexpected error in translate_message: {str(e)}")
+        await websocket.send_json({"event": "error", "message": f"Internal server error: {str(e)}"})
+
+    finally:
+        try:
+            await websocket.close()
+        except RuntimeError:
+            logger.info("✏️ WebSocket already closed, skipping close attempt")

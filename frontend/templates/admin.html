@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/admin.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <div class="container">
+                <div class="profile-header">
+                    <h2>Admin Panel</h2>
+                    <i class="fas fa-ellipsis-v menu-icon"></i>
+                </div>
+
+                <!-- Statistics -->
+                <div class="stats-section">
+                    <h3>Statistics</h3>
+                    <p>Private Chats: {{ private_chats_count }}</p>
+                    <p>Groups: {{ groups_count }}</p>
+                    <p>Total Users: {{ users|length }}</p>
+                </div>
+
+                <!-- Users -->
+                <div class="users-section">
+                    <h3>Users</h3>
+                    <div class="users-list">
+                        {% for user in users %}
+                        <div class="user-item">
+                            <div class="user-avatar">
+                                {% if user.avatar_url %}
+                                <img src="{{ user.avatar_url }}" alt="Avatar">
+                                {% else %}
+                                <img src="/static/avatars/default_avatar.png" alt="Default Avatar">
+                                {% endif %}
+                            </div>
+                            <div class="user-info">
+                                <p><strong>{{ user.username }}</strong></p>
+                                <p>{{ user.email }}</p>
+                            </div>
+                            <button class="delete-user-btn" data-user-id="{{ user.id }}">Delete</button>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Chats -->
+                <div class="chats-section">
+                    <h3>Chats</h3>
+                    <div class="chats-list">
+                        {% for chat in chats %}
+                        <div class="chat-item">
+                            <div class="chat-info">
+                                <p><strong>{{ chat.name }}</strong></p>
+                                <p>Type: {{ chat.type }}</p>
+                                <p>Participants: {{ chat.participant_count }}</p>
+                            </div>
+                            <div class="chat-actions">
+                                <a href="/dash/admin/view_chat/{{ chat.id }}" class="view-chat-btn">View</a>
+                                <button class="delete-chat-btn" data-chat-id="{{ chat.id }}">Delete</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Messages (если выбран чат) -->
+                {% if selected_chat %}
+                <div class="messages-section">
+                    <h3>Messages in {{ selected_chat.name }}</h3>
+                    <div class="messages-list">
+                        {% for message in messages %}
+                        <div class="message-item">
+                            <p><strong>{{ message.sender }}</strong> at {{ message.timestamp }}:</p>
+                            {% if message.content %}
+                            <p>{{ message.content }}</p>
+                            {% endif %}
+                            {% if message.image %}
+                            <img src="{{ message.image }}" alt="Message Image" style="max-width: 200px;">
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Navigation Icons -->
+            <div class="nav-icons">
+                <div class="nav-item" id="nav-chatss">
+                    <div class="nav-circle">
+                        <a href="/dash/"><i class="fas fa-comment-alt"></i></a>
+                    </div>
+                </div>
+                <div class="nav-item" id="nav-status">
+                    <div class="nav-circle">
+                        <a href="/dash/status"><i class="fas fa-video"></i></a>
+                    </div>
+                </div>
+                <div class="nav-item" id="nav-favorites">
+                    <div class="nav-circle">
+                        <a href="/dash/favorites"><i class="fas fa-star"></i></a>
+                    </div>
+                </div>
+                <div class="nav-item" id="nav-add-contacts">
+                    <div class="nav-circle">
+                        <a href="/dash/add_con"><i class="fas fa-user-plus"></i></a>
+                    </div>
+                </div>
+                <div class="nav-item" id="nav-profile">
+                    <div class="nav-circle">
+                        <a href="/dash/profile"><i class="fas fa-user"></i></a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-area-con"></div>
+    </div>
+
+    <script>
+        // Удаление пользователя
+        document.querySelectorAll('.delete-user-btn').forEach(button => {
+            button.addEventListener('click', async function () {
+                const userId = this.getAttribute('data-user-id');
+                if (confirm(`Are you sure you want to delete user ID ${userId}?`)) {
+                    try {
+                        const response = await fetch(`/dash/admin/delete_user/${userId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                        } else {
+                            const error = await response.json();
+                            alert('Error: ' + error.detail);
+                        }
+                    } catch (error) {
+                        alert('Error deleting user: ' + error.message);
+                    }
+                }
+            });
+        });
+
+        // Удаление чата
+        document.querySelectorAll('.delete-chat-btn').forEach(button => {
+            button.addEventListener('click', async function () {
+                const chatId = this.getAttribute('data-chat-id');
+                if (confirm(`Are you sure you want to delete chat ID ${chatId}?`)) {
+                    try {
+                        const response = await fetch(`/dash/admin/delete_chat/${chatId}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                        } else {
+                            const error = await response.json();
+                            alert('Error: ' + error.detail);
+                        }
+                    } catch (error) {
+                        alert('Error deleting chat: ' + error.message);
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>

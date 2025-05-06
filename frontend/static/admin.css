@@ -1,0 +1,306 @@
+:root {
+    --primary-color: #008069;
+    --secondary-color: #f0f2f5;
+    --chat-bg-color: #e5ddd5;
+    --text-color: #111b21;
+    --light-text: #FFFFFF;
+    --border-color: #FFFFFF;
+    --outgoing-bg: #d9fdd3;
+    --incoming-bg: #ffffff;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Helvetica Neue, Helvetica, Arial, sans-serif;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* App container */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* Sidebar */
+.sidebar {
+    width: 350px;
+    background-color: #f4f4f4;
+    display: flex;
+    flex-direction: column;
+    height: 100vh; /* Full viewport height */
+    border-right: 1px solid #ddd;
+}
+
+.container {
+    background-color: #386158;
+    flex: 1; /* Take available space, excluding nav-icons */
+    overflow-y: auto; /* Enable vertical scrolling */
+    overflow-x: hidden;
+    padding-bottom: 20px;
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px 20px;
+}
+
+.profile-header h2 {
+    font-size: 30px;
+    font-weight: 500;
+    color: white;
+}
+
+.menu-icon {
+    font-size: 30px;
+    cursor: pointer;
+    color: white;
+}
+
+/* Statistics Section */
+.stats-section {
+    padding: 20px;
+}
+
+.stats-section h3 {
+    font-size: 20px;
+    color: white;
+    margin-bottom: 15px;
+}
+
+.stats-section p {
+    font-size: 16px;
+    color: white;
+    margin: 5px 0;
+}
+
+/* Users Section */
+.users-section {
+    padding: 20px;
+}
+
+.users-section h3 {
+    font-size: 20px;
+    color: white;
+    margin-bottom: 15px;
+}
+
+.users-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.user-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.user-avatar img {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.user-info {
+    flex: 1;
+    color: white;
+}
+
+.user-info p {
+    font-size: 14px;
+    margin: 2px 0;
+}
+
+.delete-user-btn {
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.delete-user-btn:hover {
+    background-color: #cc0000;
+}
+
+/* Chats Section */
+.chats-section {
+    padding: 20px;
+}
+
+.chats-section h3 {
+    font-size: 20px;
+    color: white;
+    margin-bottom: 15px;
+}
+
+.chats-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.chat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.chat-info {
+    color: white;
+}
+
+.chat-info p {
+    font-size: 14px;
+    margin: 2px 0;
+}
+
+.chat-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.view-chat-btn {
+    background-color: #2BDB89;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 5px;
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.view-chat-btn:hover {
+    background-color: #00af9c;
+}
+
+.delete-chat-btn {
+    background-color: #ff4d4d;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.delete-chat-btn:hover {
+    background-color: #cc0000;
+}
+
+/* Messages Section */
+.messages-section {
+    padding: 20px;
+}
+
+.messages-section h3 {
+    font-size: 20px;
+    color: white;
+    margin-bottom: 15px;
+}
+
+.messages-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.message-item {
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: white;
+}
+
+.message-item p {
+    font-size: 14px;
+    margin: 2px 0;
+}
+
+/* Navigation Icons */
+.nav-icons {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding: 14px;
+    background-color: #386158;
+    position: sticky;
+    bottom: 0;
+    width: 100%;
+    z-index: 10; /* Ensure icons stay above content */
+}
+
+.nav-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+}
+
+.nav-circle {
+    width: 40px;
+    height: 40px;
+    background-color: #303F3B;
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: background-color 0.3s, border 0.3s;
+    border: 1px solid #2bdb89;
+}
+
+.nav-circle i {
+    color: #2BDB89;
+    font-size: 20px;
+}
+
+.nav-circle:hover {
+    background-color: white;
+    border: 2px solid #2bdb89;
+}
+
+.nav-circle:hover i {
+    color: #2bdb89;
+}
+
+.chat-area-con {
+    background-image: url('/static/resourses/background.png');
+    background-position: right center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    flex: 1;
+}
+
+.chat-area-con::before {
+    content: "CHATSAPP";
+    position: absolute;
+    top: 45%;
+    left: 65%;
+    transform: translate(-50%, -50%);
+    font-size: 5rem;
+    font-weight: bold;
+    color: white;
+    z-index: 1;
+}
